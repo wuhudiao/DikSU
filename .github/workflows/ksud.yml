@@ -1,0 +1,123 @@
+name: Build ksud
+on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+      pack_lkm:
+        required: false
+        type: boolean
+        default: false
+      pack_ksuinit:
+        required: false
+        type: boolean
+        default: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      build_log_b64: ${{ steps.upload-log.outputs.build_log_b64 }}
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v8
+    
+    - name: Prepare LKM files
+      if: ${{ inputs.pack_lkm }}
+      run: |
+        cp aarch64-android*-lkm/*_kernelsu.ko ./userspace/ksud/bin/aarch64/
+        cp x86_64-android*-lkm/*_kernelsu.ko ./userspace/ksud/bin/x86_64/
+    
+    - name: Prepare ksuinit
+      if: ${{ inputs.pack_ksuinit }}
+      run: |
+        mv ksuinit-aarch64/ksuinit ./userspace/ksud/bin/aarch64/
+        mv ksuinit-x86_64/ksuinit ./userspace/ksud/bin/x86_64/
+        
+    - name: Setup rustup
+      run: |
+        rustup update stable
+        rustup target add ${{ inputs.target }}
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: userspace/ksud
+        cache-targets: false
+
+    - uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r29
+
+    - name: Setup Java
+      uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: 21
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v4
+
+    - name: Build applabel.dex and appicon.dex
+      run: |
+        cd userspace/ksud/assets/applabel
+        # Find android.jar
+        ANDROID_JAR=$(find $ANDROID_HOME/platforms -name "android.jar" | sort -V | tail -n 1)
+        echo "Using android.jar: $ANDROID_JAR"
+        # Compile Java to class
+        javac -source 1.8 -target 1.8 -cp "$ANDROID_JAR" AppLabelDumper.java AppIconDumper.java
+        # Compile class to dex
+        D8=$(find $ANDROID_HOME/build-tools -name "d8" | sort -V | tail -n 1)
+        echo "Using d8: $D8"
+        "$D8" --output . AppLabelDumper.class --lib "$ANDROID_JAR"
+        mv classes.dex applabel.dex
+        "$D8" --output . AppIconDumper.class --lib "$ANDROID_JAR"
+        mv classes.dex appicon.dex
+        ls -la applabel.dex appicon.dex
+        # Ensure bin dirs exist (they may not if pack_lkm=false)
+        mkdir -p ../../bin/aarch64 ../../bin/x86_64
+        # Copy dex to both arch bin dirs so ensure_binaries extracts it
+        cp applabel.dex ../../bin/aarch64/applabel.dex
+        cp applabel.dex ../../bin/x86_64/applabel.dex
+        cp appicon.dex ../../bin/aarch64/appicon.dex
+        cp appicon.dex ../../bin/x86_64/appicon.dex
+        # Verify
+        ls -la ../../bin/aarch64/applabel.dex ../../bin/x86_64/applabel.dex ../../bin/aarch64/appicon.dex ../../bin/x86_64/appicon.dex
+        cd ../../..
+
+    - name: Build ksud
+      env:
+        ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      run: |
+        touch build.log
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          export KSU_PACKAGE_NAME="me.weishu.kernelsu.pr"
+        fi
+        source .github/scripts/setup-rust-build.sh ${{ inputs.target }} 26
+        cargo build --target $TRIPLE --release --manifest-path ./userspace/ksud/Cargo.toml 2>&1 | tee build.log
+        exit ${PIPESTATUS[0]}
+
+    - name: Upload build log on failure
+      id: upload-log
+      if: failure()
+      run: |
+        touch build.log
+        echo "build_log_b64=$(base64 -w0 build.log)" >> $GITHUB_OUTPUT
+        echo "log_size=$(wc -c < build.log)" >> $GITHUB_OUTPUT
+      continue-on-error: true
+    - name: Upload build log artifact on failure
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: build-log-${{ inputs.target }}
+        path: build.log
+
+    - name: Upload ksud artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: ksud-${{ inputs.target }}
+        path: target/${{ inputs.target }}/release/ksud

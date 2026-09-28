@@ -12,7 +12,7 @@
     <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
 
     <application
-        android:name=".KernelSUApplication"
+        android:name="com.mngr.app.Entry"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:directBootAware="true"
@@ -23,9 +23,16 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.KernelSU"
-        android:zygotePreloadName="me.weishu.kernelsu.magica.AppZygotePreload">
+        android:zygotePreloadName="com.mngr.app.magica.AppZygotePreload">
+        <!-- The baseline-profile installer is a library component, and the only thing in the app
+             that answers intent actions with "profile" in them. It costs a little startup polish and
+             nothing else, so it goes: nothing here declares itself as a profiler. -->
+        <receiver
+            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+            tools:node="remove" />
+
         <activity
-            android:name=".ui.MainActivity"
+            android:name="com.mngr.app.ui.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.KernelSU.Starting"
             android:windowSoftInputMode="adjustResize">
@@ -64,7 +71,7 @@
         </activity>
 
         <activity
-            android:name=".ui.webui.WebUIActivity"
+            android:name="com.mngr.app.ui.WebUIActivity"
             android:autoRemoveFromRecents="true"
             android:configChanges="density|orientation|screenSize|screenLayout|smallestScreenSize|uiMode|locale|layoutDirection|fontScale|keyboard|keyboardHidden"
             android:documentLaunchMode="intoExisting"
@@ -83,19 +90,19 @@
         </provider>
 
         <service
-            android:name=".magica.MagicaService"
+            android:name="com.mngr.app.magica.MagicaService"
             android:directBootAware="true"
             android:exported="false"
             android:isolatedProcess="true"
             android:useAppZygote="true" />
 
         <service
-            android:name=".ui.util.DownloadService"
+            android:name="com.mngr.app.service.DownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
         <receiver
-            android:name=".magica.BootCompletedReceiver"
+            android:name="com.mngr.app.magica.BootCompletedReceiver"
             android:directBootAware="true"
             android:enabled="false"
             android:exported="false"
@@ -105,7 +112,7 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
             <intent-filter>
-                <action android:name="me.weishu.kernelsu.magica.LAUNCH" />
+                <action android:name="com.mngr.app.magica.LAUNCH" />
             </intent-filter>
         </receiver>
     </application>

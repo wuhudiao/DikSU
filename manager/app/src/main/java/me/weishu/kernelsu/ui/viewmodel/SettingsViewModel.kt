@@ -212,21 +212,6 @@ class SettingsViewModel(
         _uiState.update { it.copy(pagerInterceptionMode = mode.coerceIn(0, 2)) }
     }
 
-    fun setEnableBlur(enabled: Boolean) {
-        repo.enableBlur = enabled
-        _uiState.update { it.copy(enableBlur = enabled) }
-    }
-
-    fun setEnableFloatingBottomBar(enabled: Boolean) {
-        repo.enableFloatingBottomBar = enabled
-        _uiState.update { it.copy(enableFloatingBottomBar = enabled) }
-    }
-
-    fun setEnableFloatingBottomBarBlur(enabled: Boolean) {
-        repo.enableFloatingBottomBarBlur = enabled
-        _uiState.update { it.copy(enableFloatingBottomBarBlur = enabled) }
-    }
-
     fun setEnableNavigationBadge(enabled: Boolean) {
         repo.enableNavigationBadge = enabled
         _uiState.update { it.copy(enableNavigationBadge = enabled) }

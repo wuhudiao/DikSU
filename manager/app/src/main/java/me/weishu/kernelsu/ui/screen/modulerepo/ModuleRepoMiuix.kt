@@ -87,7 +87,6 @@ import me.weishu.kernelsu.ui.component.miuix.SearchBox
 import me.weishu.kernelsu.ui.component.miuix.SearchPager
 import me.weishu.kernelsu.ui.component.miuix.deferredTopPadding
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
-import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.download
 import me.weishu.kernelsu.ui.util.isDownloadAvailable
@@ -1034,7 +1033,9 @@ fun ModuleRepoDetailScreenMiuix(
 ) {
     val context = LocalContext.current
     val enableBlur = LocalEnableBlur.current
-    val actionIconTint = colorScheme.onSurface.copy(alpha = if (isInDarkTheme()) 0.7f else 0.9f)
+    // Its own container's colour, not the page's: these chips are bright in either theme, and
+    // the text the page turns white over a picture would vanish on them.
+    val actionIconTint = colorScheme.onSecondaryContainer
     val secondaryContainer = colorScheme.secondaryContainer.copy(alpha = 0.8f)
     val module = state.module
     val scope = rememberCoroutineScope()

@@ -14,6 +14,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,7 +25,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -29,6 +35,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
 import me.weishu.kernelsu.R
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
 import me.weishu.kernelsu.ui.util.FlashResult
 import me.weishu.kernelsu.ui.util.LkmSelection
 import me.weishu.kernelsu.ui.util.downloadBoot
@@ -41,6 +49,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
+import top.yukonga.miuix.kmp.basic.Text as MiuixText
+import top.yukonga.miuix.kmp.basic.TextButton as MiuixTextButton
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 enum class FlashingStatus {
     FLASHING,
@@ -240,32 +252,65 @@ fun JailbreakFlashWarningDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(android.R.string.dialog_alert_title)) },
-        text = {
-            Text(
-                stringResource(R.string.jailbreak_flash_warning),
-                style = MaterialTheme.typography.bodyMedium
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                enabled = countdown == 0
-            ) {
+    val confirmText = if (countdown > 0) {
+        stringResource(R.string.jailbreak_flash_warning_countdown, countdown)
+    } else {
+        stringResource(R.string.install_next)
+    }
+
+    if (LocalUiMode.current == UiMode.Miuix) {
+        OverlayDialog(
+            show = true,
+            title = stringResource(android.R.string.dialog_alert_title),
+            onDismissRequest = onDismiss,
+            content = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    MiuixText(
+                        text = stringResource(R.string.jailbreak_flash_warning),
+                        color = colorScheme.onSurface,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        MiuixTextButton(
+                            text = stringResource(android.R.string.cancel),
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                        )
+                        MiuixTextButton(
+                            text = confirmText,
+                            onClick = onConfirm,
+                            enabled = countdown == 0,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            },
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(android.R.string.dialog_alert_title)) },
+            text = {
                 Text(
-                    if (countdown > 0)
-                        stringResource(R.string.jailbreak_flash_warning_countdown, countdown)
-                    else
-                        stringResource(R.string.install_next)
+                    stringResource(R.string.jailbreak_flash_warning),
+                    style = MaterialTheme.typography.bodyMedium
                 )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = onConfirm,
+                    enabled = countdown == 0
+                ) {
+                    Text(confirmText)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(android.R.string.cancel))
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(android.R.string.cancel))
-            }
-        }
-    )
+        )
+    }
 }

@@ -5,6 +5,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.KsuIsValid
@@ -21,7 +22,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 @Composable
 fun RebootListPopupMiuix(
     modifier: Modifier = Modifier,
-    alignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd
+    alignment: PopupPositionProvider.Align = PopupPositionProvider.Align.TopEnd,
+    iconTint: Color = colorScheme.onBackground,
 ) {
     val showTopPopup = remember { mutableStateOf(false) }
     KsuIsValid {
@@ -34,7 +36,7 @@ fun RebootListPopupMiuix(
             Icon(
                 imageVector = MiuixIcons.Close2,
                 contentDescription = stringResource(id = R.string.reboot),
-                tint = colorScheme.onBackground
+                tint = iconTint
             )
         }
         OverlayListPopup(

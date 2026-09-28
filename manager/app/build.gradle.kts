@@ -23,7 +23,7 @@ val managerVersionCode = rootProject.extra["managerVersionCode"] as Int
 val managerVersionName = rootProject.extra["managerVersionName"] as String
 
 val isPrBuild = project.findProperty("IS_PR_BUILD")?.toString()?.toBoolean() ?: false
-val defaultManagerPackageName = if (isPrBuild) "me.weishu.kernelsu.pr" else "me.weishu.kernelsu"
+val defaultManagerPackageName = if (isPrBuild) "me.weishu.kernelsu.pr" else "me.diksu.kernelsu"
 val defaultManagerName = if (isPrBuild) "KernelSU PR" else "KernelSU"
 val managerPackageName = project.findProperty("KSU_PACKAGE_NAME")?.toString() ?: defaultManagerPackageName
 val managerName = project.findProperty("KSU_NAME")?.toString() ?: defaultManagerName
@@ -181,10 +181,14 @@ androidComponents {
     }
 }
 
+// The launcher label carries zero-width padding on purpose — the hidden copy rewrites that very
+// string slot in place, so its length is the room a custom name has. A file name must not carry it:
+// the padding is invisible, so the artifact reads as `DikSU__v3.3.0-…` in every listing. It comes
+// off here, and only here.
+val archivePrefix = managerName.filterNot { it == '\u200b' || it.isWhitespace() }
+
 base {
-    archivesName.set(
-        "${managerName.replace(" ", "_")}_${managerVersionName}_${managerVersionCode}"
-    )
+    archivesName.set("${archivePrefix}_${managerVersionName}_${managerVersionCode}")
 }
 
 dependencies {
@@ -241,6 +245,11 @@ dependencies {
     implementation(libs.commons.compress)
     implementation(libs.xz)
     implementation(libs.protobuf.kotlin.lite)
+
+    // Renaming and re-signing the Manager on the device, so an install can pick its own
+    // package name instead of the one baked in at build time.
+    implementation(libs.apksig)
+    implementation(libs.apkzlib)
 }
 
 kotlin {

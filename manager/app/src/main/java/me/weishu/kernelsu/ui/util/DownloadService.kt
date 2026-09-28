@@ -32,7 +32,7 @@ import okhttp3.Request
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
-class DownloadService : Service() {
+open class DownloadService : Service() {
 
     companion object {
         const val CHANNEL_ID = "download_channel"
@@ -252,7 +252,7 @@ class DownloadService : Service() {
             .setAutoCancel(true)
 
         // Add "Install" action button
-        val installIntent = Intent(this, MainActivity::class.java).apply {
+    val installIntent = Intent(this, com.mngr.app.ui.MainActivity::class.java).apply {
             action = ACTION_INSTALL_MODULE
             putExtra(EXTRA_MODULE_URI, uri.toString())
             putExtra(EXTRA_DOWNLOAD_ID, id)

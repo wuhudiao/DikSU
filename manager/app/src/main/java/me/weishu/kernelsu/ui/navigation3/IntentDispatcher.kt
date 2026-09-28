@@ -197,7 +197,7 @@ fun IntentDispatcher(intentChannel: ReceiveChannel<Intent>) {
             }
 
             is PendingAction.OpenWebUI -> {
-                val webIntent = Intent(context, WebUIActivity::class.java)
+                val webIntent = Intent(context, com.mngr.app.ui.WebUIActivity::class.java)
                     .setData(buildInternalWebUiUri(action.moduleId))
                 context.startActivity(webIntent)
             }

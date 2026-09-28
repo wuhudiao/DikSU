@@ -343,7 +343,7 @@ def do_repack(args: argparse.Namespace) -> int:
         print(
             "[WARN] ksud binary not found for architecture(s): "
             + ", ".join(missing_ksud_arches)
-            + ". Using existing libksud.so from input APK.",
+                + ". Using existing libksud.so from input APK.",
             file=sys.stderr,
         )
 

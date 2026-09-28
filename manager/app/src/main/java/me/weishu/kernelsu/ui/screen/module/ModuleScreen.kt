@@ -9,7 +9,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -147,7 +146,7 @@ fun ModulePager(
         },
         onOpenWebUi = { module ->
             webUILauncher.launch(
-                Intent(context, WebUIActivity::class.java)
+                Intent(context, com.mngr.app.ui.WebUIActivity::class.java)
                     .setData(
                         Shortcut.buildShortcutUri(module.id, ShortcutType.WebUI)
                     )

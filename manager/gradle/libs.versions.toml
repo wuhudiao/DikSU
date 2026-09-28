@@ -88,3 +88,8 @@ protobuf-kotlin-lite = { module = "com.google.protobuf:protobuf-kotlin-lite", ve
 protobuf-protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf" }
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 xz = { module = "org.tukaani:xz", version.ref = "xz" }
+
+# The Manager renames and re-signs itself on the device, so it needs a signer (apksig) and a
+# zip rewriter (apkzlib). Both ship with the Android Gradle plugin, so they follow its version.
+apksig = { group = "com.android.tools.build", name = "apksig", version.ref = "agp" }
+apkzlib = { group = "com.android.tools.build", name = "apkzlib", version.ref = "agp" }

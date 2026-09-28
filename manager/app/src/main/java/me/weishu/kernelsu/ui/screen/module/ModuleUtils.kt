@@ -5,8 +5,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -19,6 +19,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import me.weishu.kernelsu.ui.util.module.Shortcut
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
+import top.yukonga.miuix.kmp.basic.Text as MiuixText
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.roundToInt
 
 enum class ShortcutType {
@@ -80,11 +84,40 @@ fun ExpandableDescriptionText(
     maxLinesLimit: Int,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
-    style: TextStyle = LocalTextStyle.current,
+    style: TextStyle? = null,
     fontSize: TextUnit = TextUnit.Unspecified,
     textDecoration: TextDecoration? = null,
 ) {
     val progress = remember(text) { Animatable(if (expanded) 1f else 0f) }
+
+    /**
+     * The line itself, in whichever style the app is set to: the Material text draws black in a
+     * Miuix page (no Material theme is in scope there) and its metrics are not the page's either.
+     */
+    @Composable
+    fun DescriptionText(maxLines: Int, overflow: TextOverflow) {
+        when (LocalUiMode.current) {
+            UiMode.Material -> Text(
+                text = text,
+                color = color,
+                style = style ?: LocalTextStyle.current,
+                fontSize = fontSize,
+                textDecoration = textDecoration,
+                maxLines = maxLines,
+                overflow = overflow,
+            )
+
+            UiMode.Miuix -> MiuixText(
+                text = text,
+                color = color,
+                style = style ?: MiuixTheme.textStyles.main,
+                fontSize = fontSize,
+                textDecoration = textDecoration,
+                maxLines = maxLines,
+                overflow = overflow,
+            )
+        }
+    }
 
     LaunchedEffect(expanded) {
         val target = if (expanded) 1f else 0f
@@ -102,27 +135,11 @@ fun ExpandableDescriptionText(
         modifier = modifier.clipToBounds()
     ) { constraints ->
         val collapsedPlaceable = subcompose(DescriptionSlot.Collapsed) {
-            Text(
-                text = text,
-                color = color,
-                style = style,
-                fontSize = fontSize,
-                textDecoration = textDecoration,
-                maxLines = maxLinesLimit,
-                overflow = TextOverflow.Ellipsis
-            )
+            DescriptionText(maxLines = maxLinesLimit, overflow = TextOverflow.Ellipsis)
         }.first().measure(constraints)
 
         val expandedPlaceable = subcompose(DescriptionSlot.Expanded) {
-            Text(
-                text = text,
-                color = color,
-                style = style,
-                fontSize = fontSize,
-                textDecoration = textDecoration,
-                maxLines = Int.MAX_VALUE,
-                overflow = TextOverflow.Clip
-            )
+            DescriptionText(maxLines = Int.MAX_VALUE, overflow = TextOverflow.Clip)
         }.first().measure(constraints)
 
         val collapsedHeight = collapsedPlaceable.height

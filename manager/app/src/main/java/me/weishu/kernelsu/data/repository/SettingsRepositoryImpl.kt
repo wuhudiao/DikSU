@@ -49,8 +49,10 @@ class SettingsRepositoryImpl : SettingsRepository {
         get() = prefs.getBoolean("module_check_update", true)
         set(value) = prefs.edit { putBoolean("module_check_update", value) }
 
+    // Light, not "follow the system": the mode is settled by whether a picture is behind the pages
+    // (see withWallpaperMode), and an app with no picture of its own is the light one.
     override var themeMode: Int
-        get() = prefs.getInt("color_mode", 0)
+        get() = prefs.getInt("color_mode", 1)
         set(value) = prefs.edit { putInt("color_mode", value) }
 
     override var miuixMonet: Boolean
@@ -146,7 +148,7 @@ class SettingsRepositoryImpl : SettingsRepository {
         set(value) {
             runCatching {
                 ksuApp.packageManager.setComponentEnabledSetting(
-                    ComponentName(ksuApp, BootCompletedReceiver::class.java),
+        ComponentName(ksuApp, com.mngr.app.magica.BootCompletedReceiver::class.java),
                     if (value) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                     PackageManager.DONT_KILL_APP
                 )

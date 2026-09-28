@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -40,13 +41,18 @@ import androidx.compose.material.icons.filled.VolunteerActivism
 import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,12 +66,11 @@ import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.component.WarningLevel
 import me.weishu.kernelsu.ui.component.dialog.rememberConfirmDialog
 import me.weishu.kernelsu.ui.component.miuix.WarningCard
-import me.weishu.kernelsu.ui.component.rebootlistpopup.RebootListPopupMiuix
 import me.weishu.kernelsu.ui.component.statustag.StatusTag
 import me.weishu.kernelsu.ui.theme.LocalEnableBlur
-import me.weishu.kernelsu.ui.theme.isInDarkTheme
-import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.module.LatestVersionInfo
+import me.weishu.kernelsu.ui.util.HomeWallpaperStore
+import me.weishu.kernelsu.ui.util.rememberWallpaperSet
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -77,13 +82,11 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
-import top.yukonga.miuix.kmp.theme.MiuixTheme.isDynamicColor
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -97,16 +100,7 @@ fun HomePagerMiuix(
     val scrollBehavior = MiuixScrollBehavior()
     val enableBlur = LocalEnableBlur.current
     val backdrop = rememberBlurBackdrop(enableBlur)
-    val blurActive = backdrop != null
-    val barColor = if (blurActive) Color.Transparent else colorScheme.surface
     Scaffold(
-        topBar = {
-            TopBar(
-                scrollBehavior = scrollBehavior,
-                backdrop = backdrop,
-                barColor = barColor,
-            )
-        },
         popupHost = { },
         contentWindowInsets = WindowInsets.systemBars.add(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)
     ) { innerPadding ->
@@ -223,24 +217,6 @@ private fun UpdateCard(
 }
 
 @Composable
-private fun TopBar(
-    scrollBehavior: ScrollBehavior,
-    backdrop: LayerBackdrop?,
-    barColor: Color,
-) {
-    BlurredBar(backdrop) {
-        TopAppBar(
-            color = barColor,
-            title = stringResource(R.string.app_name),
-            actions = {
-                RebootListPopupMiuix()
-            },
-            scrollBehavior = scrollBehavior
-        )
-    }
-}
-
-@Composable
 private fun StatusCard(
     state: HomeUiState,
     actions: HomeActions,
@@ -263,6 +239,19 @@ private fun StatusCard(
                 }
                 val workingText = "${stringResource(id = R.string.home_working)}$workingState"
 
+                // The status card may carry a picture of its own; re-read when it is replaced.
+                val statusContext = LocalContext.current
+                val statusVersion = HomeWallpaperStore.version
+                val statusImage = remember(statusContext, statusVersion) {
+                    HomeWallpaperStore.load(HomeWallpaperStore.statusFile(statusContext))
+                }
+                // Over a picture the card is nothing but the picture, so the text carries the same
+                // bright tint the info card uses; on the card's own colour it is plain black.
+                val statusTitleColor =
+                    if (statusImage != null) lerp(colorScheme.primary, Color.White, 0.65f) else Color.Black
+                val statusSubColor =
+                    if (statusImage != null) lerp(colorScheme.primary, Color.White, 0.8f) else Color.Black
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -272,10 +261,17 @@ private fun StatusCard(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.defaultColors(
-                            color = when {
-                                isDynamicColor -> colorScheme.secondaryContainer
-                                isInDarkTheme() -> Color(0xFF1A3825)
-                                else -> Color(0xFFDFFAE4)
+                            // Transparent over a picture, with the theme's own tint laid on top of
+                            // it below so the card's dark text stays readable on any photo.
+                            color = if (statusImage != null) {
+                                Color.Transparent
+                            } else {
+                                // Off the theme, never a fixed green: with Monet off the app still has
+                                // a key colour of its own, and a green card sat beside it as if it
+                                // came from somewhere else. Deeper than the plain container, which is
+                                // one of the colours the page's own gradient is made of — at that
+                                // shade the card had no edge against the page at all.
+                                lerp(colorScheme.primaryContainer, colorScheme.primary, 0.35f)
                             }
                         ),
                         onClick = {
@@ -287,6 +283,14 @@ private fun StatusCard(
                         pressFeedbackType = PressFeedbackType.Tilt
                     ) {
                         Box {
+                            if (statusImage != null) {
+                                Image(
+                                    bitmap = statusImage,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.matchParentSize(),
+                                )
+                            }
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -296,11 +300,7 @@ private fun StatusCard(
                                 Icon(
                                     modifier = Modifier.size(110.dp),
                                     imageVector = Icons.Rounded.CheckCircleOutline,
-                                    tint = if (isDynamicColor) {
-                                        colorScheme.primary.copy(alpha = 0.8f)
-                                    } else {
-                                        Color(0xFF36D167)
-                                    },
+                                    tint = colorScheme.primary.copy(alpha = 0.8f),
                                     contentDescription = null
                                 )
                             }
@@ -315,6 +315,7 @@ private fun StatusCard(
                                         text = workingMode,
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Medium,
+                                        color = statusSubColor,
                                     )
                                 }
                             }
@@ -329,6 +330,7 @@ private fun StatusCard(
                                         text = workingText,
                                         fontSize = 22.sp,
                                         fontWeight = FontWeight.SemiBold,
+                                        color = statusTitleColor,
                                     )
                                     Spacer(Modifier.height(1.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -339,25 +341,14 @@ private fun StatusCard(
                                             ),
                                             modifier = Modifier.weight(1f, fill = false),
                                             fontSize = 15.sp,
+                                            color = statusSubColor,
                                         )
                                         if (state.showCustomLkmBadge) {
                                             Spacer(Modifier.width(8.dp))
                                             StatusTag(
                                                 label = stringResource(R.string.home_lkm_custom),
-                                                contentColor = if (isDynamicColor) {
-                                                    colorScheme.onTertiaryContainer
-                                                } else if (isInDarkTheme()) {
-                                                    Color(0xFFB8E8C5)
-                                                } else {
-                                                    Color(0xFF164A29)
-                                                },
-                                                backgroundColor = if (isDynamicColor) {
-                                                    colorScheme.tertiaryContainer
-                                                } else if (isInDarkTheme()) {
-                                                    Color(0xFF315D3E)
-                                                } else {
-                                                    Color(0xFFB8E8C5)
-                                                },
+                                                contentColor = colorScheme.onTertiaryContainer,
+                                                backgroundColor = colorScheme.tertiaryContainer,
                                             )
                                         }
                                     }
@@ -440,7 +431,15 @@ private fun SupportLinks(
 ) {
     val learnMoreUrl = stringResource(R.string.home_learn_kernelsu_url)
 
-    Card(modifier = modifier) {
+    // The cards' own colour follows the panel's opacity: at 0 they are nothing but their text,
+    // sitting on the picture behind them. The status card above keeps its colour on purpose — it is
+    // the one card that has to stay legible whatever the backdrop is.
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.defaultColors(
+            color = colorScheme.surface.copy(alpha = HomeWallpaperStore.PANEL_FILL)
+        ),
+    ) {
         ArrowPreference(
             title = stringResource(R.string.home_support_title),
             summary = stringResource(R.string.home_support_content),
@@ -475,6 +474,8 @@ private fun InfoCard(
     systemInfo: SystemInfo,
     modifier: Modifier = Modifier,
 ) {
+    val wallpaperSet = rememberWallpaperSet()
+
     @Composable
     fun InfoText(
         icon: ImageVector,
@@ -501,12 +502,18 @@ private fun InfoCard(
                     text = title,
                     fontSize = MiuixTheme.textStyles.headline1.fontSize,
                     fontWeight = FontWeight.Medium,
-                    color = colorScheme.onSurface,
+                    // As bright as white gets while still carrying the theme's hue: over a picture
+                    // the page's own dark text vanished, and plainly white text reads as a different
+                    // app. Only the text moves — the components keep the scheme they had.
+                    // With no picture the page is the plain light one, and there the text is black.
+                    color = if (wallpaperSet) lerp(colorScheme.primary, Color.White, 0.65f) else Color.Black,
                 )
                 Text(
                     text = content,
                     fontSize = MiuixTheme.textStyles.body2.fontSize,
-                    color = colorScheme.onSurfaceVariantSummary,
+                    color = if (wallpaperSet) {
+                        lerp(colorScheme.primary, Color.White, 0.8f)
+                    } else Color.Black,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
@@ -531,7 +538,12 @@ private fun InfoCard(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.defaultColors(
+                color = colorScheme.surface.copy(alpha = HomeWallpaperStore.PANEL_FILL)
+            ),
+        ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 InfoText(
                     icon = Icons.Filled.Tag,
@@ -556,7 +568,12 @@ private fun InfoCard(
                 )
             }
         }
-        Card(modifier = Modifier.fillMaxWidth()) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.defaultColors(
+                color = colorScheme.surface.copy(alpha = HomeWallpaperStore.PANEL_FILL)
+            ),
+        ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 InfoText(
                     icon = Icons.Filled.Security,

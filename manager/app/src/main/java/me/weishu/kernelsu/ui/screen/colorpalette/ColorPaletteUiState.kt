@@ -17,15 +17,13 @@ data class ColorPaletteUiState(
 @Immutable
 data class ColorPaletteScreenActions(
     val onBack: () -> Unit,
+    val onSetUiModeIndex: (Int) -> Unit,
     val onSetThemeMode: (Int) -> Unit,
     val onSetMiuixMonet: (Boolean) -> Unit,
     val onSetKeyColor: (Int) -> Unit,
     val onSetColorMode: (ColorMode) -> Unit,
     val onSetColorStyle: (String) -> Unit,
     val onSetColorSpec: (String) -> Unit,
-    val onSetEnableBlur: (Boolean) -> Unit,
-    val onSetEnableFloatingBottomBar: (Boolean) -> Unit,
-    val onSetEnableFloatingBottomBarBlur: (Boolean) -> Unit,
     val onSetEnableNavigationBadge: (Boolean) -> Unit,
     val onSetEnablePredictiveBack: (Boolean) -> Unit,
     val onSetEnableSwipeDismiss: (Boolean) -> Unit,

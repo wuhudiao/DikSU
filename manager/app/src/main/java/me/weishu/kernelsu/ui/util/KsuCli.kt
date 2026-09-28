@@ -24,7 +24,6 @@ import me.weishu.kernelsu.core.tasks.ProbeResult
 import me.weishu.kernelsu.core.utils.DataSourceChannel
 import me.weishu.kernelsu.ksuApp
 import okhttp3.OkHttpClient
-import org.json.JSONArray
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -139,14 +138,6 @@ fun listModules(): String {
     return out.joinToString("\n").ifBlank { "[]" }
 }
 
-fun getModuleCount(): Int {
-    val result = listModules()
-    runCatching {
-        val array = JSONArray(result)
-        return array.length()
-    }.getOrElse { return 0 }
-}
-
 fun getSuperuserCount(): Int {
     return Natives.getSuperuserCount()
 }
@@ -255,7 +246,8 @@ fun restoreBoot(
 fun uninstallPermanently(
     onStdout: (String) -> Unit, onStderr: (String) -> Unit
 ): FlashResult {
-    val result = flashWithIO("${getKsuDaemonPath()} uninstall --package-name ${BuildConfig.APPLICATION_ID}", onStdout, onStderr)
+    // The Manager can be running under a name of its own, so ask the app what it is called.
+    val result = flashWithIO("${getKsuDaemonPath()} uninstall --package-name ${ksuApp.packageName}", onStdout, onStderr)
     return FlashResult(result)
 }
 

@@ -16,7 +16,6 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
-import me.weishu.kernelsu.ui.util.shouldShowSplitPane
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.utils.springAnimateToPage
@@ -104,9 +103,20 @@ internal fun badgeFor(index: Int, state: NavigationBadgeState): NavBadge? = when
     else -> null
 }
 
+/**
+ * Whether navigation lives in a rail down the left edge instead of a bar along the bottom.
+ *
+ * A wide window has always used the rail — that is what `shouldShowSplitPane` measures, and there
+ * the bar would sit against the screen's shortest edge for no reason. Portrait uses it too now: the
+ * rail costs a column of icons and gives back the strip the bar reserved at the bottom of every
+ * page, so the two orientations finally agree on where navigation is.
+ *
+ * The exception is Miuix with the floating bar turned on. That bar is a deliberate choice, and it
+ * floats over the content instead of reserving a strip, so it is not the thing being replaced.
+ */
 @Composable
 fun useNavigationRail(enableFloatingBottomBar: Boolean): Boolean {
-    return shouldShowSplitPane() && !(LocalUiMode.current == UiMode.Miuix && enableFloatingBottomBar)
+    return !(LocalUiMode.current == UiMode.Miuix && enableFloatingBottomBar)
 }
 
 @Composable

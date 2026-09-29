@@ -135,10 +135,11 @@ fun BottomBar(
 @Composable
 fun SideRail(
     navigationBadge: NavigationBadgeState,
+    backdrop: LayerBackdrop? = null,
     modifier: Modifier = Modifier,
 ) {
     when (LocalUiMode.current) {
-        UiMode.Miuix -> NavigationRailMiuix(navigationBadge, modifier)
+        UiMode.Miuix -> NavigationRailMiuix(navigationBadge, backdrop, modifier)
         UiMode.Material -> NavigationRailMaterial(navigationBadge, modifier)
     }
 }

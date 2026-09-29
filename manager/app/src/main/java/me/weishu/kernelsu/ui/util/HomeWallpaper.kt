@@ -3,6 +3,7 @@ package me.weishu.kernelsu.ui.util
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -53,7 +54,10 @@ import java.io.File
 fun rememberWallpaperSet(): Boolean {
     val context = LocalContext.current
     val version = HomeWallpaperStore.version
-    return remember(context, version) { HomeWallpaperStore.file(context).exists() }
+    return remember(context, version) {
+        HomeWallpaperStore.file(context).exists() ||
+            HomeWallpaperStore.videoFile(context).exists()
+    }
 }
 
 /**
@@ -72,6 +76,9 @@ object HomeWallpaperStore {
 
     private const val NAME = "home-wallpaper.jpg"
     private const val STATUS_NAME = "home-status-card.jpg"
+    private const val VIDEO_NAME = "home-wallpaper.mp4"
+    /** A backdrop clip above this size is refused; phones handle far less gracefully. */
+    private const val MAX_VIDEO_BYTES = 200L * 1024 * 1024
     // Big enough for a full screen: at 1440 the picture was upscaled to fill one and read as soft.
     private const val MAX_EDGE = 2880
     private const val QUALITY = 95
@@ -90,6 +97,8 @@ object HomeWallpaperStore {
     fun file(context: Context): File = File(context.filesDir, NAME)
 
     fun statusFile(context: Context): File = File(context.filesDir, STATUS_NAME)
+
+    fun videoFile(context: Context): File = File(context.filesDir, VIDEO_NAME)
 
     /** The picture in [file], decoded small enough to keep a phone photo out of trouble. */
     fun load(file: File): ImageBitmap? = runCatching {
@@ -198,7 +207,184 @@ object HomeWallpaperStore {
         biasY: Float,
         zoom: Float,
     ): Boolean = copyIn(context, uri, file(context), aspect, biasX, biasY, zoom)
-        .also { if (it) version++ }
+        .also {
+            if (it) {
+                videoFile(context).delete()
+                version++
+            }
+        }
+
+    /**
+     * A looping clip as the backdrop. Copied as-is — no crop dialog: the player centre-crops at
+     * draw time. One backdrop at a time, so setting a video drops the still (and with it the
+     * frosted card's sample source, which falls back to the theme gradient while a video plays).
+     */
+    /**
+     * The MP4 a motion photo (live photo) hides after its JPEG frames: the picture is a normal
+     * JPEG whose tail carries one full MP4 box — [size][ftyp]... — so a live photo saved through
+     * the picker as image/jpeg can still become a moving backdrop.
+     */
+    private fun extractMotionMp4(jpeg: ByteArray): ByteArray? {
+        if (jpeg.size < 32) return null
+        // Last "ftyp" in the file: the embedded video's type box (video boxes sit in the tail).
+        var pos = -1
+        var i = jpeg.size - 8
+        while (i >= 0) {
+            if (jpeg[i + 4] == 'f'.code.toByte() && jpeg[i + 5] == 't'.code.toByte() &&
+                jpeg[i + 6] == 'y'.code.toByte() && jpeg[i + 7] == 'p'.code.toByte()
+            ) {
+                pos = i
+                break
+            }
+            i--
+        }
+        if (pos < 4) return null
+        val boxStart = pos - 4
+        // The video lives in the picture's tail; anything in the first half is a false hit.
+        if (boxStart < jpeg.size / 2) return null
+        val size = ((jpeg[boxStart].toInt() and 0xff) shl 24) or
+            ((jpeg[boxStart + 1].toInt() and 0xff) shl 16) or
+            ((jpeg[boxStart + 2].toInt() and 0xff) shl 8) or
+            (jpeg[boxStart + 3].toInt() and 0xff)
+        val end = if (size in 16..jpeg.size - boxStart) boxStart + size else jpeg.size
+        return jpeg.copyOfRange(boxStart, end)
+    }
+
+    private const val VIDEO_POS = "video_pos"
+
+    /** Live crop of the video backdrop: bias 0.5 is centred, zoom 1 is plain centre-crop. */
+    data class VideoCrop(val biasX: Float, val biasY: Float, val zoom: Float)
+
+    /** Read by the player every transform; written by the crop dialog. */
+    var videoCropState = androidx.compose.runtime.mutableStateOf(VideoCrop(0.5f, 0.5f, 1f))
+
+    fun loadVideoCrop(context: Context) {
+        val sp = context.getSharedPreferences(VIDEO_POS, Context.MODE_PRIVATE)
+        videoCropState.value = VideoCrop(
+            sp.getFloat("x", 0.5f),
+            sp.getFloat("y", 0.5f),
+            sp.getFloat("zoom", 1f),
+        )
+    }
+
+    fun saveVideoCrop(context: Context, biasX: Float, biasY: Float, zoom: Float) {
+        context.getSharedPreferences(VIDEO_POS, Context.MODE_PRIVATE).edit()
+            .putFloat("x", biasX)
+            .putFloat("y", biasY)
+            .putFloat("zoom", zoom)
+            .apply()
+        videoCropState.value = VideoCrop(biasX, biasY, zoom)
+    }
+
+    /**
+     * The moving backdrop needs a still twin: the outer frame blurs it once (fixed, never
+     * re-sampled) and the frosted card samples it, so rail and card stay in step with a single
+     * frozen frame while the panel plays the video sharp.
+     */
+    private fun writeStillRepresentative(context: Context, source: android.graphics.Bitmap): Boolean =
+        runCatching {
+            val framed = crop(source, WALLPAPER_ASPECT, 0.5f, 0.5f, 1f)
+            file(context).outputStream().use { out ->
+                framed.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            }
+            if (framed !== source) framed.recycle()
+            android.util.Log.i("HomeWallpaper", "still representative written ${file(context).length()} bytes")
+            true
+        }.getOrDefault(false)
+
+    /** The clip's first frame as a temp JPEG — the crop dialog previews that, like a still. */
+    fun videoFirstFrame(context: Context, uri: Uri): Uri? = runCatching {
+        val mmr = MediaMetadataRetriever()
+        mmr.setDataSource(context, uri)
+        val frame = mmr.getFrameAtTime(0)
+        mmr.release()
+        frame ?: return null
+        val out = java.io.File(context.cacheDir, "video-frame.jpg")
+        out.outputStream().use { frame.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, it) }
+        if (!frame.isRecycled) frame.recycle()
+        Uri.fromFile(out)
+    }.getOrNull()
+
+    fun saveVideo(context: Context, uri: Uri): Boolean {
+        val tag = "HomeWallpaper"
+        return try {
+            val resolver = context.contentResolver
+            val mime = runCatching { resolver.getType(uri) }.getOrNull()
+            android.util.Log.i(tag, "saveVideo: uri=$uri mime=$mime")
+            val out = videoFile(context)
+            val isStill = mime?.startsWith("image/") == true
+            if (isStill) {
+                // Motion photo: read the picture, pull its embedded clip, save that.
+                val jpeg = resolver.openInputStream(uri)?.use { input ->
+                    val bos = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(64 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        total += read
+                        if (total > MAX_VIDEO_BYTES) throw IllegalStateException("still too large")
+                        bos.write(buffer, 0, read)
+                    }
+                    bos.toByteArray()
+                } ?: throw IllegalStateException("cannot open still")
+                val mp4 = extractMotionMp4(jpeg)
+                if (mp4 == null) {
+                    android.util.Log.w(tag, "saveVideo: no embedded mp4 in motion photo")
+                    return false
+                }
+                out.outputStream().use { it.write(mp4) }
+                android.util.Log.i(tag, "saveVideo: extracted motion mp4 ${mp4.size} bytes")
+            } else {
+                // Plain video: stream it, cap as we go (statSize is unreliable on picker uris).
+                var total = 0L
+                val copied = resolver.openInputStream(uri)?.use { input ->
+                    out.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            total += read
+                            if (total > MAX_VIDEO_BYTES) {
+                                throw IllegalStateException("video too large")
+                            }
+                            output.write(buffer, 0, read)
+                        }
+                        true
+                    }
+                } ?: false
+                if (!copied) throw IllegalStateException("empty stream")
+                android.util.Log.i(tag, "saveVideo: streamed $total bytes")
+            }
+            // Frozen twin for the outer frame and the frosted card (both sample stills).
+            val stillOk = if (isStill) {
+                val decoded = runCatching {
+                    out.inputStream().use { BitmapFactory.decodeStream(it) }
+                }.getOrNull()
+                decoded?.let { writeStillRepresentative(context, it) } ?: false
+            } else {
+                val frameUri = videoFirstFrame(context, uri)
+                val decoded = frameUri?.let {
+                    runCatching {
+                        context.contentResolver.openInputStream(it)?.use { s ->
+                            BitmapFactory.decodeStream(s)
+                        }
+                    }.getOrNull()
+                }
+                decoded?.let { writeStillRepresentative(context, it) } ?: false
+            }
+            if (!stillOk) {
+                android.util.Log.w(tag, "saveVideo: still representative failed (video kept)")
+            }
+            version++
+            android.util.Log.i(tag, "saveVideo: ok still=$stillOk")
+            true
+        } catch (e: Exception) {
+            android.util.Log.e(tag, "saveVideo failed", e)
+            runCatching { videoFile(context).delete() }
+            false
+        }
+    }
 
     fun saveStatusCard(
         context: Context,
@@ -218,6 +404,7 @@ object HomeWallpaperStore {
 
     fun clear(context: Context) {
         file(context).delete()
+        videoFile(context).delete()
         version++
     }
 }
@@ -231,6 +418,7 @@ fun HomeWallpaperPreference() {
     // showed, so the choice is made once and never revisited while drawing.
     var pending by remember { mutableStateOf<Uri?>(null) }
     var pendingStatusCard by remember { mutableStateOf(false) }
+    var pendingVideoCrop by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
@@ -245,6 +433,35 @@ fun HomeWallpaperPreference() {
         startAction = {},
         onClick = {
             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        },
+    )
+
+    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val saved = withContext(Dispatchers.IO) {
+                    HomeWallpaperStore.saveVideo(context, uri)
+                }
+                if (saved) {
+                    val frame = withContext(Dispatchers.IO) {
+                        HomeWallpaperStore.videoFirstFrame(context, uri)
+                    }
+                    if (frame != null) {
+                        pendingVideoCrop = true
+                        pending = frame
+                    }
+                }
+            }
+        }
+    }
+    ArrowPreference(
+        title = "选择视频背景",
+        summary = "首页背景循环播放所选视频(静音),与静态壁纸互斥",
+        startAction = {},
+        onClick = {
+            videoPicker.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+            )
         },
     )
     // The status card gets a picture of its own: it is the one card the panel's opacity leaves
@@ -278,6 +495,7 @@ fun HomeWallpaperPreference() {
     val open = pending
     if (open != null) {
         val statusCard = pendingStatusCard
+        val videoCrop = pendingVideoCrop
         val aspect = if (statusCard) {
             HomeWallpaperStore.STATUS_ASPECT
         } else {
@@ -291,12 +509,27 @@ fun HomeWallpaperPreference() {
                 pending = null
                 scope.launch {
                     withContext(Dispatchers.IO) {
-                        if (statusCard) {
+                        if (videoCrop) {
+                            HomeWallpaperStore.saveVideoCrop(context, biasX, biasY, zoom)
+                        } else if (statusCard) {
                             HomeWallpaperStore.saveStatusCard(
                                 context, open, aspect, biasX, biasY, zoom,
                             )
                         } else {
-                            HomeWallpaperStore.save(context, open, aspect, biasX, biasY, zoom)
+                            HomeWallpaperStore.save(
+                                context, open, aspect, biasX, biasY, zoom,
+                            )
+                        }
+                    }
+                }
+                pendingVideoCrop = false
+                pendingStatusCard = false
+                // The crop preview frame is a temp file; drop it either way.
+                runCatching {
+                    if (videoCrop) {
+                        val path = open.path
+                        if (path != null && path.contains("video-frame.jpg")) {
+                            java.io.File(path).delete()
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.google.protobuf.gradle.id
+import org.gradle.api.tasks.Copy
 
 plugins {
     alias(libs.plugins.agp.app)
@@ -27,6 +28,11 @@ val defaultManagerPackageName = if (isPrBuild) "me.weishu.kernelsu.pr" else "me.
 val defaultManagerName = if (isPrBuild) "KernelSU PR" else "KernelSU"
 val managerPackageName = project.findProperty("KSU_PACKAGE_NAME")?.toString() ?: defaultManagerPackageName
 val managerName = project.findProperty("KSU_NAME")?.toString() ?: defaultManagerName
+val keystoreFileName = project.findProperty("KEYSTORE_FILE")?.toString() ?: "key.jks"
+val keystorePassword = project.findProperty("KEYSTORE_PASSWORD")?.toString().orEmpty()
+val keyAlias = project.findProperty("KEY_ALIAS")?.toString().orEmpty()
+val keyPassword = project.findProperty("KEY_PASSWORD")?.toString().orEmpty()
+val generatedKeystoreAssets = layout.buildDirectory.dir("generated/ksu-keystore-assets").get().asFile
 
 apksign {
     storeFileProperty = "KEYSTORE_FILE"
@@ -62,6 +68,8 @@ val baseCppFlags = baseCFlags + "-fno-rtti"
 
 android {
     namespace = "me.weishu.kernelsu"
+
+    sourceSets.getByName("main").assets.srcDir(generatedKeystoreAssets)
 
     buildTypes {
         debug {
@@ -149,6 +157,9 @@ android {
         applicationId = managerPackageName
 
         buildConfigField("boolean", "IS_PR_BUILD", isPrBuild.toString())
+        buildConfigField("String", "KSU_KEYSTORE_PASSWORD", "\"$keystorePassword\"")
+        buildConfigField("String", "KSU_KEY_ALIAS", "\"$keyAlias\"")
+        buildConfigField("String", "KSU_KEY_PASSWORD", "\"$keyPassword\"")
         resValue("string", "app_name", managerName)
 
         externalNativeBuild {
@@ -173,6 +184,16 @@ android {
         sourceCompatibility = androidSourceCompatibility
         targetCompatibility = androidTargetCompatibility
     }
+}
+
+val copyKsuKeystore = tasks.register<Copy>("copyKsuKeystore") {
+    from(rootProject.file(keystoreFileName))
+    into(generatedKeystoreAssets)
+    rename { "kernelsu.jks" }
+}
+
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+    dependsOn(copyKsuKeystore)
 }
 
 androidComponents {

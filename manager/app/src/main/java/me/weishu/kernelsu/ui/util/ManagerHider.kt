@@ -62,9 +62,6 @@ object ManagerHider {
     private const val ANDROID_MANIFEST = "AndroidManifest.xml"
     private const val RESOURCE_TABLE = "resources.arsc"
     private const val KEYSTORE_ASSET = "kernelsu.jks"
-    private const val STORE_PASSWORD = "kernelsu123456"
-    private const val KEY_ALIAS = "kernelsu"
-    private const val KEY_PASSWORD = "kernelsu123456"
     private const val ALPHABET = "abcdefghijklmnopqrstuvwxyz"
 
     /** The ABI folders a Manager build can carry ksud in. */
@@ -332,10 +329,10 @@ private const val MAIN_COMPONENT = "com.mngr.app.ui.MainActivity"
     private fun sign(context: Context, apk: File, target: File) {
         context.assets.open(KEYSTORE_ASSET).use { stream ->
             val keystore = KeyStore.getInstance("PKCS12")
-                .apply { load(stream, STORE_PASSWORD.toCharArray()) }
-            val key = keystore.getKey(KEY_ALIAS, KEY_PASSWORD.toCharArray()) as PrivateKey
-            val chain = keystore.getCertificateChain(KEY_ALIAS).map { it as X509Certificate }
-            ApkSigner.Builder(listOf(ApkSigner.SignerConfig.Builder(KEY_ALIAS, key, chain).build()))
+                .apply { load(stream, BuildConfig.KSU_KEYSTORE_PASSWORD.toCharArray()) }
+            val key = keystore.getKey(BuildConfig.KSU_KEY_ALIAS, BuildConfig.KSU_KEY_PASSWORD.toCharArray()) as PrivateKey
+            val chain = keystore.getCertificateChain(BuildConfig.KSU_KEY_ALIAS).map { it as X509Certificate }
+            ApkSigner.Builder(listOf(ApkSigner.SignerConfig.Builder(BuildConfig.KSU_KEY_ALIAS, key, chain).build()))
                 .setInputApk(apk)
                 .setOutputApk(target)
                 // minSdk is 31, so v1 has nothing to say. v2 is the block the kernel reads

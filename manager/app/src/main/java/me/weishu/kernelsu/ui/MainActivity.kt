@@ -33,6 +33,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -100,6 +102,7 @@ import me.weishu.kernelsu.ui.util.getSuperuserCount
 import me.weishu.kernelsu.ui.util.install
 import me.weishu.kernelsu.ui.util.ManagerHider
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
+import me.weishu.kernelsu.ui.screen.home.GlassNudge
 import me.weishu.kernelsu.ui.util.rememberContentReady
 import me.weishu.kernelsu.ui.viewmodel.MainActivityViewModel
 import me.weishu.kernelsu.ui.viewmodel.MainPagerConfig
@@ -129,9 +132,12 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import me.weishu.kernelsu.ui.util.HomeWallpaperStore
 import me.weishu.kernelsu.ui.util.rememberWallpaperSet
+import me.weishu.kernelsu.ui.util.VideoBackdrop
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxSize
@@ -139,7 +145,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -165,6 +170,9 @@ open class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         splashStartedAt = SystemClock.uptimeMillis()
         super.onCreate(savedInstanceState)
+        GlassNudge.load(this)
+        HomeWallpaperStore.loadVideoCrop(this)
+        BackgroundDim.load(this)
         splashScreen.setKeepOnScreenCondition {
             !contentReady || SystemClock.uptimeMillis() - splashStartedAt < splashAnimationDurationMs
         }
@@ -325,6 +333,37 @@ open class MainActivity : ComponentActivity() {
 
 val LocalMainPagerState = staticCompositionLocalOf<MainPagerState> { error("LocalMainPagerState not provided") }
 
+/**
+ * Backdrop dimming for the picture/video behind the pages, tuned live from the theme settings
+ * slider. One value drives every background sheet — outer frame and panel — so they never drift.
+ */
+object BackgroundDim {
+    private const val PREF = "background_dim"
+    val value = mutableFloatStateOf(0.35f)
+
+    fun load(context: android.content.Context) {
+        val sp = context.getSharedPreferences(PREF, android.content.Context.MODE_PRIVATE)
+        value.floatValue = sp.getFloat("dim", 0.35f)
+    }
+
+    fun save(context: android.content.Context, dim: Float) {
+        value.floatValue = dim
+        context.getSharedPreferences(PREF, android.content.Context.MODE_PRIVATE).edit()
+            .putFloat("dim", dim)
+            .apply()
+    }
+}
+
+/**
+ * The page panel's real pixel size and window position. The frosted card crops the wallpaper with
+ * exactly these numbers so its picture is the same crop the panel shows; residual error is dialled
+ * out by the GlassNudge constants in HomeMiuix.
+ */
+object PanelMetrics {
+    val size = mutableStateOf(IntSize.Zero)
+    val pos = mutableStateOf(Offset.Zero)
+}
+
 /** The page panel's edge shading: how wide the band is, and how dark it starts out. */
 private val EDGE_SHADE = 12.dp
 private val EDGE_SHADOW = Color.Black.copy(alpha = 0.12f)
@@ -478,6 +517,7 @@ fun MainScreen(
             val startInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
                 .only(WindowInsetsSides.Start)
             val navBarBottomPadding = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
+            val panelInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical).asPaddingValues()
 
             when (uiMode) {
                 UiMode.Material -> androidx.compose.material3.Scaffold(
@@ -499,6 +539,11 @@ fun MainScreen(
                     // The home's backdrop, re-read whenever the picture is replaced.
                     val wallpaperContext = LocalContext.current
                     val wallpaperVersion = HomeWallpaperStore.version
+                    val videoPath = remember(wallpaperVersion) {
+                        HomeWallpaperStore.videoFile(wallpaperContext).absolutePath.takeIf {
+                            HomeWallpaperStore.videoFile(wallpaperContext).exists()
+                        }
+                    }
                     val homeWallpaper = remember(wallpaperContext, wallpaperVersion) {
                         runCatching {
                             val file = HomeWallpaperStore.file(wallpaperContext)
@@ -513,47 +558,63 @@ fun MainScreen(
                             )?.asImageBitmap()
                         }.getOrNull()
                     }
+                    // The rail's pill refracts this frame, so the frame needs a layer of its own:
+                    // the pager's backdrop stops at the panel, which is exactly where the rail is not.
+                    // This rail glass is independent from the app-wide blur preference.
+                    val railBackdrop = rememberLayerBackdrop {
+                        drawRect(surfaceColor)
+                        drawContent()
+                    }
                     // The frame around the page, built the way Aster builds its scene: a backdrop
                     // that is blurred and darkened, a plate under the rail so the icons keep their
                     // contrast, and the page panel on top of all of it — blurred outside, sharp in.
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize().background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        MiuixTheme.colorScheme.primaryContainer,
-                                        MiuixTheme.colorScheme.secondaryContainer,
-                                        MiuixTheme.colorScheme.background,
-                                    )
-                                )
-                            )
-                        )
-                        if (homeWallpaper != null) {
-                            Image(
-                                bitmap = homeWallpaper,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                // Lighter than before: 32dp blurred a photograph into a smear rather
-                                // than a backdrop.
-                                modifier = Modifier.fillMaxSize().blur(12.dp),
-                            )
-                            Box(
-                                modifier = Modifier.fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.35f))
-                            )
-                        }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                    ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxHeight()
-                                .width(84.dp)
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(Color.Black.copy(alpha = 0.25f), Color.Transparent)
+                                .fillMaxSize()
+                                .layerBackdrop(railBackdrop),
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize().background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            MiuixTheme.colorScheme.primaryContainer,
+                                            MiuixTheme.colorScheme.secondaryContainer,
+                                            MiuixTheme.colorScheme.background,
+                                        )
                                     )
                                 )
-                        )
+                            )
+                            if (homeWallpaper != null) {
+                                Image(
+                                    bitmap = homeWallpaper,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    // Lighter than before: 32dp blurred a photograph into a smear rather
+                                    // than a backdrop.
+                                    modifier = Modifier.fillMaxSize().blur(12.dp),
+                                )
+                                Box(
+                                    modifier = Modifier.fillMaxSize()
+                                        .background(Color.Black.copy(alpha = BackgroundDim.value.floatValue))
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(84.dp)
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(Color.Black.copy(alpha = 0.25f), Color.Transparent)
+                                        )
+                                    )
+                            )
+                        }
                     Row {
-                        SideRail(navigationBadge)
+                        SideRail(navigationBadge, railBackdrop)
                         // The page rides in a rounded panel inset from the top, the end and the
                         // bottom, so the rail's divider reads as the frame the app is wrapped in.
                         Box(
@@ -563,9 +624,9 @@ fun MainScreen(
                                 // Nothing the page draws may spill past the frame: a shadow that
                                 // escaped below the panel read as a second card poking out.
                                 .clipToBounds()
-                                .windowInsetsPadding(
-                                    WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical)
-                                ),
+                                // Consumed in full so the pages still see no status bar of their
+                                // own; the padding below is what is left once the line is raised.
+                                .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical)),
                         ) {
                             // Rounded on the rail side only: the panel runs to the end of the screen,
                             // so the two corners out there would be a curve against the bezel for no
@@ -579,17 +640,38 @@ fun MainScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(top = 8.dp, bottom = 8.dp)
+                                    // The top line sits just under the status-bar icons: left at the
+                                    // raw inset it stood 165px off the top against 74px at the bottom.
+                                    .padding(
+                                        top = panelInsets.calculateTopPadding() + 8.dp - 20.dp,
+                                        bottom = panelInsets.calculateBottomPadding() + 8.dp,
+                                    )
                                     .clip(pagePanelShape)
                                     .border(
                                         width = 1.dp,
                                         color = MiuixTheme.colorScheme.dividerLine,
                                         shape = pagePanelShape,
-                                    ),
+                                    )
+                                    .onGloballyPositioned { coords ->
+                                        PanelMetrics.size.value = coords.size
+                                        PanelMetrics.pos.value = coords.positionInWindow()
+                                    },
                             ) {
                                 // The same picture inside the line, sharp: the blur belongs to the
                                 // frame outside it, and the page sits on the untouched photograph.
-                                if (homeWallpaper != null) {
+                                if (videoPath != null) {
+                                    // Sharp inside the panel, like the still: the blur belongs to
+                                    // the outer frame, not the page the reader looks at.
+                                    VideoBackdrop(
+                                        path = videoPath,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                    Box(
+                                        modifier = Modifier.fillMaxSize().background(
+                                            Color.Black.copy(alpha = BackgroundDim.value.floatValue)
+                                        )
+                                    )
+                                } else if (homeWallpaper != null) {
                                     Image(
                                         bitmap = homeWallpaper,
                                         contentDescription = null,
@@ -600,7 +682,7 @@ fun MainScreen(
                                     // picture is still the picture at this much.
                                     Box(
                                         modifier = Modifier.fillMaxSize().background(
-                                            Color.Black.copy(alpha = 0.28f)
+                                            Color.Black.copy(alpha = BackgroundDim.value.floatValue)
                                         )
                                     )
                                 }
@@ -664,9 +746,9 @@ fun MainScreen(
                                             val shadowPath = Path().apply {
                                                 moveTo(size.width, 0f)
                                                 lineTo(radius, 0f)
-                                                quadraticBezierTo(0f, 0f, 0f, radius)
+                                                quadraticTo(0f, 0f, 0f, radius)
                                                 lineTo(0f, size.height - radius)
-                                                quadraticBezierTo(0f, size.height, radius, size.height)
+                                                quadraticTo(0f, size.height, radius, size.height)
                                                 lineTo(size.width, size.height)
                                             }
                                             val paint = android.graphics.Paint().apply {

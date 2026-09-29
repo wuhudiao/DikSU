@@ -46,6 +46,9 @@ import androidx.compose.material.icons.rounded.ViewCarousel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.platform.LocalContext
+import me.weishu.kernelsu.ui.BackgroundDim
+import me.weishu.kernelsu.ui.MainActivity
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -174,6 +177,42 @@ fun ColorPaletteScreenMiuix(
                             .fillMaxWidth(),
                     ) {
                         HomeWallpaperPreference()
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .fillMaxWidth(),
+                    ) {
+                        val glassContext = LocalContext.current
+                        var dimValue by remember { mutableFloatStateOf(BackgroundDim.value.floatValue) }
+                        BasicComponent(
+                            title = "背景暗度",
+                            summary = "首页图片/视频背景的压暗程度",
+                            endActions = {
+                                Text(
+                                    text = "${(dimValue * 100).toInt()}%",
+                                    color = colorScheme.onSurfaceVariantActions,
+                                )
+                            },
+                            bottomAction = {
+                                Slider(
+                                    value = dimValue,
+                                    onValueChange = {
+                                        dimValue = it
+                                        BackgroundDim.value.floatValue = it
+                                    },
+                                    onValueChangeFinished = {
+                                        BackgroundDim.save(glassContext, dimValue)
+                                    },
+                                    valueRange = 0f..0.7f,
+                                    showKeyPoints = true,
+                                    keyPoints = listOf(0f, 0.175f, 0.35f, 0.525f, 0.7f),
+                                    magnetThreshold = 0f,
+                                    hapticEffect = SliderDefaults.SliderHapticEffect.Step,
+                                )
+                            },
+                        )
                     }
 
                     Card(
@@ -465,6 +504,8 @@ fun ColorPaletteScreenMiuix(
                             },
                         )
                     }
+
+
                 }
                 item {
                     Spacer(

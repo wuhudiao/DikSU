@@ -86,6 +86,12 @@ fun HomePager(
             bottomInnerPadding = bottomInnerPadding,
         )
 
+        UiMode.MiuixStock -> HomePagerMiuixStock(
+            state = uiState,
+            actions = actions,
+            bottomInnerPadding = bottomInnerPadding,
+        )
+
         UiMode.Material -> HomePagerMaterial(
             state = uiState,
             actions = actions,

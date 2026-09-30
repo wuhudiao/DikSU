@@ -11,7 +11,7 @@ fun ChooseKmiDialog(
     onSelected: (String?) -> Unit
 ) {
     when (LocalUiMode.current) {
-        UiMode.Miuix -> ChooseKmiDialogMiuix(show, onDismissRequest, onSelected)
+        UiMode.Miuix, UiMode.MiuixStock -> ChooseKmiDialogMiuix(show, onDismissRequest, onSelected)
         UiMode.Material -> ChooseKmiDialogMaterial(show, onDismissRequest, onSelected)
     }
 }

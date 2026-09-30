@@ -141,7 +141,7 @@ fun AppProfileScreen(uid: Int) {
     )
 
     when (uiMode) {
-        UiMode.Miuix -> AppProfileScreenMiuix(
+        UiMode.Miuix, UiMode.MiuixStock -> AppProfileScreenMiuix(
             state = state,
             actions = actions,
         )

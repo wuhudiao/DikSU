@@ -1,3 +1,15 @@
+/// The panel's three own state files.
+pub const WEBUI_JUMPS_PATH: &str = "/data/adb/ksu/webui_jumps.json";
+pub const WEBUI_QUICK_RUN_PATH: &str = "/data/adb/ksu/webui_quickrun.json";
+pub const WEBUI_THEME_PATH: &str = "/data/adb/ksu/webui_theme.json";
+
+/// The `sh` to hand a child.
+pub const SHELL_PATH: &str = if cfg!(target_os = "android") {
+    "/system/bin/sh"
+} else {
+    "sh"
+};
+
 #[cfg(target_os = "android")]
 mod android {
     use const_format::concatcp;
@@ -14,6 +26,8 @@ mod android {
     pub const PROFILE_TEMPLATE_DIR: &str = concatcp!(PROFILE_DIR, "templates/");
 
     pub const KSURC_PATH: &str = concatcp!(WORKING_DIR, ".ksurc");
+    pub const WEBUI_PORT_PATH: &str = concatcp!(WORKING_DIR, "webui.port");
+    pub const WEBUI_TOKEN_PATH: &str = concatcp!(WORKING_DIR, "webui.token");
     pub const DAEMON_PATH: &str = concatcp!(ADB_DIR, "ksud");
     pub const LIBADBROOT_PATH: &str = concatcp!(LIBRARY_DIR, "libadbroot.so");
 

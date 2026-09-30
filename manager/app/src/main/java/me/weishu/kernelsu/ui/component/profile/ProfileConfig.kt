@@ -15,7 +15,7 @@ fun AppProfileConfig(
     onProfileChange: (Natives.Profile) -> Unit,
 ) {
     when (LocalUiMode.current) {
-        UiMode.Miuix -> AppProfileConfigMiuix(
+        UiMode.Miuix, UiMode.MiuixStock -> AppProfileConfigMiuix(
             modifier = modifier,
             fixedName = fixedName,
             enabled = enabled,
@@ -42,7 +42,7 @@ fun RootProfileConfig(
     onProfileChange: (Natives.Profile) -> Unit,
 ) {
     when (LocalUiMode.current) {
-        UiMode.Miuix -> RootProfileConfigMiuix(
+        UiMode.Miuix, UiMode.MiuixStock -> RootProfileConfigMiuix(
             modifier = modifier,
             fixedName = fixedName,
             enabled = enabled,
@@ -68,7 +68,7 @@ fun TemplateConfig(
     onProfileChange: (Natives.Profile) -> Unit
 ) {
     when (LocalUiMode.current) {
-        UiMode.Miuix -> TemplateConfigMiuix(
+        UiMode.Miuix, UiMode.MiuixStock -> TemplateConfigMiuix(
             modifier = modifier,
             profile = profile,
             onViewTemplate = onViewTemplate,

@@ -118,6 +118,9 @@ import me.weishu.kernelsu.ui.util.BlurredBar
 import me.weishu.kernelsu.ui.util.getFileName
 import me.weishu.kernelsu.ui.util.reboot
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.DropdownImpl
@@ -770,7 +773,11 @@ fun ModuleItem(
     val secondaryContainer = colorScheme.secondaryContainer.copy(alpha = 0.8f)
     // Its own container's colour, not the page's: these chips are bright in either theme, and
     // the text the page turns white over a picture would vanish on them.
-    val actionIconTint = colorScheme.onSecondaryContainer
+    val actionIconTint = if (LocalUiMode.current == UiMode.Miuix) {
+        colorScheme.onSecondaryContainer
+    } else {
+        colorScheme.onSurface.copy(alpha = if (isInDarkTheme()) 0.7f else 0.9f)
+    }
     val updateBg = colorScheme.tertiaryContainer.copy(alpha = 0.6f)
     val updateTint = colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
     val hasUpdate = updateUrl.isNotEmpty()

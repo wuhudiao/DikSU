@@ -71,7 +71,7 @@ fun BasicSettingsScreen() {
     val onOpenProfileTemplate = dropUnlessResumed { navigator.push(Route.AppProfileTemplate) }
 
     when (LocalUiMode.current) {
-        UiMode.Miuix -> BasicSettingsMiuix(
+        UiMode.Miuix, UiMode.MiuixStock -> BasicSettingsMiuix(
             uiState, viewModel, onBack, onOpenProfileTemplate,
         )
         UiMode.Material -> BasicSettingsMaterial(

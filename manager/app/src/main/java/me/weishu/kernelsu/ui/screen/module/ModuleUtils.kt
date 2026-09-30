@@ -97,7 +97,7 @@ fun ExpandableDescriptionText(
     @Composable
     fun DescriptionText(maxLines: Int, overflow: TextOverflow) {
         when (LocalUiMode.current) {
-            UiMode.Material -> Text(
+            UiMode.Material, UiMode.MiuixStock -> Text(
                 text = text,
                 color = color,
                 style = style ?: LocalTextStyle.current,

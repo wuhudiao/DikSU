@@ -33,6 +33,34 @@ fun WarningCard(
     onClick: (() -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
+    if (me.weishu.kernelsu.ui.LocalUiMode.current != me.weishu.kernelsu.ui.UiMode.Miuix) {
+        // Stock miuix (and any shared surface): the plain card the official app ships.
+        Card(
+            modifier = modifier,
+            onClick = { onClick?.invoke() },
+            colors = CardDefaults.defaultColors(
+                color = level.containerColor(),
+                contentColor = level.contentColor(),
+            ),
+            showIndication = onClick != null,
+            pressFeedbackType = PressFeedbackType.Sink
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = message,
+                    fontSize = 14.sp
+                )
+                action?.invoke()
+            }
+        }
+        return
+    }
     // The banner rides the page's gradient the way the status card does: the container
     // colour starts it and the page's own background colour fades into it, so a notice
     // sits on the picture instead of beside it. The shadow is what keeps the edge.

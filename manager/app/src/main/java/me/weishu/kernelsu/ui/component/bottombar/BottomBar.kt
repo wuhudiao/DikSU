@@ -16,6 +16,8 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.isMiuixFamily
+import me.weishu.kernelsu.ui.util.shouldShowSplitPane
 import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.utils.springAnimateToPage
@@ -116,7 +118,12 @@ internal fun badgeFor(index: Int, state: NavigationBadgeState): NavBadge? = when
  */
 @Composable
 fun useNavigationRail(enableFloatingBottomBar: Boolean): Boolean {
-    return !(LocalUiMode.current == UiMode.Miuix && enableFloatingBottomBar)
+    val miuixFloating = LocalUiMode.current.isMiuixFamily && enableFloatingBottomBar
+    return if (LocalUiMode.current == UiMode.Miuix) {
+        !miuixFloating
+    } else {
+        shouldShowSplitPane() && !miuixFloating
+    }
 }
 
 @Composable
@@ -127,7 +134,7 @@ fun BottomBar(
     modifier: Modifier = Modifier,
 ) {
     when (LocalUiMode.current) {
-        UiMode.Miuix -> BottomBarMiuix(blurBackdrop, backdrop, navigationBadge, modifier)
+        UiMode.Miuix, UiMode.MiuixStock -> BottomBarMiuix(blurBackdrop, backdrop, navigationBadge, modifier)
         UiMode.Material -> BottomBarMaterial(navigationBadge)
     }
 }
@@ -140,6 +147,7 @@ fun SideRail(
 ) {
     when (LocalUiMode.current) {
         UiMode.Miuix -> NavigationRailMiuix(navigationBadge, backdrop, modifier)
+        UiMode.MiuixStock -> NavigationRailMiuixStock(navigationBadge, modifier)
         UiMode.Material -> NavigationRailMaterial(navigationBadge, modifier)
     }
 }

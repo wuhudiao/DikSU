@@ -127,7 +127,10 @@ object Natives {
         external get
 
     fun isFullFeatured(): Boolean {
-        return isManager && kernelUAPIVersion == managerUAPIVersion && rootAvailable()
+        // The web UI's hide flag drops the app into the same shell an unprivileged install gets:
+        // no tabs, no rail, no paging — only the home screen that reports the kernel missing.
+        return isManager && kernelUAPIVersion == managerUAPIVersion && rootAvailable() &&
+            !me.weishu.kernelsu.ui.util.isManagerHidden()
     }
 
     @Keep

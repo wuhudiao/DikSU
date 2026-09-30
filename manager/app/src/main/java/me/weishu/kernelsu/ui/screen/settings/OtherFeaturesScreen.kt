@@ -79,7 +79,7 @@ fun OtherFeaturesScreen() {
 
     when (LocalUiMode.current) {
         UiMode.Material -> OtherFeaturesMaterial(onBack, onOpenKeymint, onHideAppList)
-        UiMode.Miuix -> OtherFeaturesMiuix(onBack, onOpenKeymint, onHideAppList)
+        UiMode.Miuix, UiMode.MiuixStock -> OtherFeaturesMiuix(onBack, onOpenKeymint, onHideAppList)
     }
 
     val open = phase

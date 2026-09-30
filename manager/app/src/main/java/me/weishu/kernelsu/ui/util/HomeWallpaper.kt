@@ -436,34 +436,37 @@ fun HomeWallpaperPreference() {
         },
     )
 
-    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val saved = withContext(Dispatchers.IO) {
-                    HomeWallpaperStore.saveVideo(context, uri)
-                }
-                if (saved) {
-                    val frame = withContext(Dispatchers.IO) {
-                        HomeWallpaperStore.videoFirstFrame(context, uri)
+    if (me.weishu.kernelsu.ui.LocalUiMode.current == me.weishu.kernelsu.ui.UiMode.Miuix) {
+        // Polished build only: the moving backdrop and its crop flow.
+        val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) {
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) {
+                        HomeWallpaperStore.saveVideo(context, uri)
                     }
-                    if (frame != null) {
-                        pendingVideoCrop = true
-                        pending = frame
+                    if (saved) {
+                        val frame = withContext(Dispatchers.IO) {
+                            HomeWallpaperStore.videoFirstFrame(context, uri)
+                        }
+                        if (frame != null) {
+                            pendingVideoCrop = true
+                            pending = frame
+                        }
                     }
                 }
             }
         }
+        ArrowPreference(
+            title = "选择视频背景",
+            summary = "首页背景循环播放所选视频(静音),与静态壁纸互斥",
+            startAction = {},
+            onClick = {
+                videoPicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                )
+            },
+        )
     }
-    ArrowPreference(
-        title = "选择视频背景",
-        summary = "首页背景循环播放所选视频(静音),与静态壁纸互斥",
-        startAction = {},
-        onClick = {
-            videoPicker.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-            )
-        },
-    )
     // The status card gets a picture of its own: it is the one card the panel's opacity leaves
     // solid, so a picture there has to be chosen on purpose.
     val statusPicker = rememberLauncherForActivityResult(

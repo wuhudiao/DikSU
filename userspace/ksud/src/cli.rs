@@ -153,6 +153,47 @@ enum Commands {
         #[command(subcommand)]
         command: Initrc,
     },
+    /// Start Web UI HTTP server
+    Webui {
+        /// HTTP server port (default: per-device random port, persisted under /data/adb/ksu)
+        #[arg(short, long)]
+        port: Option<u16>,
+        /// Detach into the background and keep serving
+        #[arg(short, long)]
+        daemon: bool,
+        /// Exit after this many seconds without a request (0 = never)
+        ///
+        /// Generous by default: browsers freeze their timers while the page is hidden, so a
+        /// short timeout would kill the server every time the user switches apps.
+        #[arg(long, default_value_t = 120)]
+        idle_timeout: u64,
+        /// Serve until the launcher's guard connection closes, whatever the page is doing
+        ///
+        /// The launcher holds `/api/watch` open for as long as its background service lives, so
+        /// the port is up exactly as long as the app is: swipe the app away from recents and the
+        /// connection drops, which closes the port. The idle timeout above then only applies
+        /// until that connection arrives.
+        #[arg(long)]
+        watch: bool,
+        /// Issue a fresh access token, invalidating any address that leaked, then exit
+        #[arg(long)]
+        reset_token: bool,
+        /// Serve only while this package has a running process, releasing the port when it goes
+        ///
+        /// The port is opened when the app appears and closed when it exits, so the address
+        /// exists exactly as long as the app does. One resident process wakes up every five
+        /// seconds for a single `pidof`: no app-side service, no notification, no wakelock.
+        /// 逗号分隔可以给多个：只要其中一个还在用，端口就开着
+        ///
+        /// **管理器自己要写进去** —— 它内嵌的 WebView 打开的就是这个网页端，而那时候浏览器
+        /// 多半是关着的，少写一个自己，面板里每个开关都会报 "Failed to fetch"。
+        #[arg(long, value_name = "PACKAGES")]
+        auto_browser: Option<String>,
+        /// Set the access token — the password typed into the address — then exit
+        #[arg(long, value_name = "TOKEN")]
+        set_token: Option<String>,
+    },
+
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -811,6 +852,50 @@ pub fn run() -> Result<()> {
         Commands::Initrc { command } => match command {
             Initrc::Refresh => regenerate_preinit_rc(),
         },
+        Commands::Webui {
+            port,
+            daemon,
+            idle_timeout,
+            watch,
+            reset_token,
+            auto_browser,
+            set_token,
+        } => {
+            if let Some(token) = set_token {
+                println!("{}", crate::webui::set_token(&token)?);
+                Ok(())
+            } else if reset_token {
+                println!("{}", crate::webui::reset_token()?);
+                Ok(())
+            } else if let Some(package) = auto_browser {
+                // Detached before anything is bound: the port is meant to stay closed until the
+                // watched app shows up, so returning leaves nothing listening behind.
+                if daemon {
+                    crate::utils::daemonize(true)?;
+                }
+                let packages: Vec<String> = package
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                    .map(ToString::to_string)
+                    .collect();
+                crate::webui::serve_for_browser(&packages, port)
+            } else {
+                // Bind (and persist the port) before detaching, so the caller can read the
+                // chosen port as soon as this returns.
+                let (listener, bound_port) = crate::webui::bind_webui(port)?;
+                log::info!("Starting Web UI on port {bound_port}");
+                if daemon {
+                    crate::utils::daemonize(true)?;
+                }
+                let idle = std::time::Duration::from_secs(idle_timeout);
+                if watch {
+                    crate::webui::serve_watched(listener, idle)
+                } else {
+                    crate::webui::serve(listener, idle)
+                }
+            }
+        }
     };
 
     if let Err(e) = &result {

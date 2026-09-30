@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.isMiuixFamily
 import top.yukonga.miuix.kmp.basic.TextButton as MiuixTextButton
 import top.yukonga.miuix.kmp.basic.Text as MiuixText
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
@@ -44,7 +45,7 @@ fun HideAppListDialog(
     onDismiss: () -> Unit,
     onRun: (Boolean) -> Unit,
 ) {
-    if (LocalUiMode.current == UiMode.Miuix) {
+    if (LocalUiMode.current.isMiuixFamily) {
         HideAppListDialogMiuix(phase, onDismiss, onRun)
     } else {
         HideAppListDialogMaterial(phase, onDismiss, onRun)

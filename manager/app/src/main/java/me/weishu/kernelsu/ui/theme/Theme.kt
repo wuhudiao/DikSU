@@ -84,7 +84,7 @@ object ThemeController {
         val uiMode = repo.uiMode
         var colorModeValue = repo.themeMode
 
-        if (uiMode == "miuix") {
+        if (uiMode != "material") {
             val miuixMonet = repo.miuixMonet
             val colorMode = ColorMode.fromValue(colorModeValue)
             colorModeValue = if (!miuixMonet && colorMode.isMonet) {
@@ -123,7 +123,7 @@ fun KernelSUTheme(
 ) {
 
     when (uiMode) {
-        UiMode.Miuix -> MiuixKernelSUTheme(
+        UiMode.Miuix, UiMode.MiuixStock -> MiuixKernelSUTheme(
             appSettings = appSettings,
             content = content
         )

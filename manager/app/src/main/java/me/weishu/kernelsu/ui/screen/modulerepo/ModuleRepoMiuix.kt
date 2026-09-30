@@ -92,6 +92,9 @@ import me.weishu.kernelsu.ui.util.download
 import me.weishu.kernelsu.ui.util.isDownloadAvailable
 import me.weishu.kernelsu.ui.util.rememberBlurBackdrop
 import me.weishu.kernelsu.ui.util.rememberContentReady
+import me.weishu.kernelsu.ui.LocalUiMode
+import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.theme.isInDarkTheme
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.DropdownImpl
@@ -1035,7 +1038,11 @@ fun ModuleRepoDetailScreenMiuix(
     val enableBlur = LocalEnableBlur.current
     // Its own container's colour, not the page's: these chips are bright in either theme, and
     // the text the page turns white over a picture would vanish on them.
-    val actionIconTint = colorScheme.onSecondaryContainer
+    val actionIconTint = if (LocalUiMode.current == UiMode.Miuix) {
+        colorScheme.onSecondaryContainer
+    } else {
+        colorScheme.onSurface.copy(alpha = if (isInDarkTheme()) 0.7f else 0.9f)
+    }
     val secondaryContainer = colorScheme.secondaryContainer.copy(alpha = 0.8f)
     val module = state.module
     val scope = rememberCoroutineScope()

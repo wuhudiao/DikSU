@@ -122,8 +122,10 @@ class SettingsViewModel(
         val oldMode = repo.uiMode
         val currentThemeMode = repo.themeMode
 
-        val newThemeMode = when (oldMode) {
-            "material" if mode == "miuix" -> {
+        val enteringMiuix = oldMode == "material" && mode != "material"
+        val leavingMiuix = oldMode != "material" && mode == "material"
+        val newThemeMode = when {
+            enteringMiuix -> {
                 val colorMode = ColorMode.fromValue(currentThemeMode)
                 val baseMode = if (colorMode == ColorMode.DARK_AMOLED) 2 else currentThemeMode
                 if (repo.miuixMonet && !colorMode.isMonet) {
@@ -133,7 +135,7 @@ class SettingsViewModel(
                 } else baseMode
             }
 
-            "miuix" if mode == "material" -> {
+            leavingMiuix -> {
                 val colorMode = ColorMode.fromValue(currentThemeMode)
                 if (colorMode.isMonet) {
                     colorMode.toNonMonetMode()
@@ -155,7 +157,7 @@ class SettingsViewModel(
 
     fun setThemeMode(mode: Int) {
         val currentUiMode = repo.uiMode
-        val effectiveMode = if (currentUiMode == "miuix" && _uiState.value.miuixMonet) {
+        val effectiveMode = if (currentUiMode != "material" && _uiState.value.miuixMonet) {
             mode + 3
         } else {
             mode
@@ -210,6 +212,21 @@ class SettingsViewModel(
     fun setPagerInterceptionMode(mode: Int) {
         repo.pagerInterceptionMode = mode
         _uiState.update { it.copy(pagerInterceptionMode = mode.coerceIn(0, 2)) }
+    }
+
+    fun setEnableBlur(enabled: Boolean) {
+        repo.enableBlur = enabled
+        _uiState.update { it.copy(enableBlur = enabled) }
+    }
+
+    fun setEnableFloatingBottomBar(enabled: Boolean) {
+        repo.enableFloatingBottomBar = enabled
+        _uiState.update { it.copy(enableFloatingBottomBar = enabled) }
+    }
+
+    fun setEnableFloatingBottomBarBlur(enabled: Boolean) {
+        repo.enableFloatingBottomBarBlur = enabled
+        _uiState.update { it.copy(enableFloatingBottomBarBlur = enabled) }
     }
 
     fun setEnableNavigationBadge(enabled: Boolean) {

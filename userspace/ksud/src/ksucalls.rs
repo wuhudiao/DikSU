@@ -388,3 +388,153 @@ pub fn set_ksu_no_new_privs() -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+/// Get app profile from kernel by uid
+pub fn get_app_profile(uid: i32) -> Result<ksu_uapi::app_profile> {
+    let mut profile: ksu_uapi::app_profile = unsafe { std::mem::zeroed() };
+    profile.version = ksu_uapi::KSU_APP_PROFILE_VER;
+    profile.curr_uid = uid;
+    let mut cmd = ksu_uapi::ksu_get_app_profile_cmd { profile };
+    ksuctl(ksu_uapi::KSU_IOCTL_GET_APP_PROFILE, &raw mut cmd)?;
+    Ok(cmd.profile)
+}
+
+/// Set app profile to kernel
+pub fn set_app_profile(profile: &ksu_uapi::app_profile) -> Result<()> {
+    let mut cmd = ksu_uapi::ksu_set_app_profile_cmd { profile: *profile };
+    ksuctl(ksu_uapi::KSU_IOCTL_SET_APP_PROFILE, &raw mut cmd)?;
+    Ok(())
+}
+
+/// Check if an app has root permission (allow_su)
+pub fn is_app_granted(uid: i32) -> bool {
+    get_app_profile(uid).is_ok_and(|profile| profile.allow_su)
+}
+
+/// Fill root_profile with default values matching APK Manager (Natives.kt Profile defaults)
+/// Key: use_default=true, but selinux_domain="u:r:ksu:s0" and flags=NO_NEW_PRIVS must still be set
+fn fill_default_root_profile(profile: &mut ksu_uapi::app_profile) {
+    // Accessing union fields is unsafe in Rust
+    unsafe {
+        let rp = &mut profile.__bindgen_anon_1.rp_config;
+        // APK default: rootUseDefault = true
+        rp.use_default = true;
+        // template_name stays empty (zeroed)
+        // APK default: uid=0, gid=0
+        rp.profile.uid = 0;
+        rp.profile.gid = 0;
+        // APK default: groups = empty list
+        rp.profile.groups_count = 0;
+        // groups already zeroed
+        // APK default: capabilities = empty list -> effective=0, permitted/inheritable stay 0
+        rp.profile.capabilities.effective = 0;
+        rp.profile.capabilities.permitted = 0;
+        rp.profile.capabilities.inheritable = 0;
+        // APK default: context = "u:r:ksu:s0" (KERNEL_SU_DOMAIN)
+        let domain = b"u:r:ksu:s0";
+        for (i, &b) in domain.iter().enumerate() {
+            if i < 63 {
+                rp.profile.selinux_domain[i] = b as _;
+            }
+        }
+        rp.profile.selinux_domain[domain.len().min(63)] = 0;
+        // APK default: namespace = INHERITED (0)
+        rp.profile.namespaces = 0;
+        // APK default: flags = FLAG_KSU_NO_NEW_PRIVS (1)
+        rp.profile.flags = 1;
+    }
+}
+
+/// Grant root permission to an app
+pub fn grant_app(uid: i32, package_name: &str) -> Result<()> {
+    let mut profile = get_app_profile(uid).unwrap_or_else(|_| {
+        // Create new profile if not exists
+        let mut p: ksu_uapi::app_profile = unsafe { std::mem::zeroed() };
+        p.version = ksu_uapi::KSU_APP_PROFILE_VER;
+        p.curr_uid = uid;
+        // Copy package name to key (use `as _` for cross-platform char signedness)
+        let name_bytes = package_name.as_bytes();
+        let len = name_bytes.len().min(255);
+        for (slot, byte) in p.key.iter_mut().zip(&name_bytes[..len]) {
+            *slot = *byte as _;
+        }
+        p
+    });
+    profile.allow_su = true;
+    // Fill root_profile with APK Manager default values
+    fill_default_root_profile(&mut profile);
+    // Log detailed profile info for debugging
+    unsafe {
+        let rp = &profile.__bindgen_anon_1.rp_config;
+        let domain_str: String = rp
+            .profile
+            .selinux_domain
+            .iter()
+            .take_while(|&&c| c != 0)
+            .map(|&c| char::from(c.to_ne_bytes()[0]))
+            .collect();
+        log::info!(
+            "grant_app profile: uid={uid} pkg={package_name} version={} curr_uid={} allow_su={} use_default={} rp_uid={} rp_gid={} groups_count={} caps_eff={} caps_perm={} caps_inh={} selinux_domain='{}' namespaces={} flags={}",
+            profile.version,
+            profile.curr_uid,
+            profile.allow_su,
+            rp.use_default,
+            rp.profile.uid,
+            rp.profile.gid,
+            rp.profile.groups_count,
+            rp.profile.capabilities.effective,
+            rp.profile.capabilities.permitted,
+            rp.profile.capabilities.inheritable,
+            domain_str,
+            rp.profile.namespaces,
+            rp.profile.flags
+        );
+    }
+    let result = set_app_profile(&profile);
+    if let Err(ref e) = result {
+        log::error!("grant_app failed for uid={uid} pkg={package_name}: {e}");
+    } else {
+        log::info!("grant_app succeeded for uid={uid} pkg={package_name}");
+    }
+    result
+}
+
+/// Revoke root permission from an app
+pub fn revoke_app(uid: i32) -> Result<()> {
+    if let Ok(mut profile) = get_app_profile(uid) {
+        profile.allow_su = false;
+        set_app_profile(&profile)?;
+    }
+    Ok(())
+}
+
+/// Default non-root profile UID (NOBODY_UID)
+const DEFAULT_PROFILE_UID: i32 = 9999;
+
+/// Get default "umount modules" setting for non-root apps
+pub fn get_default_umount_modules() -> bool {
+    // Missing profile means "enabled", matching stock KernelSU behaviour.
+    get_app_profile(DEFAULT_PROFILE_UID).map_or(true, |profile| {
+        // Access union field safely - nrp_config is used for non-root profiles
+        unsafe { profile.__bindgen_anon_1.nrp_config.profile.umount_modules }
+    })
+}
+
+/// Set default "umount modules" setting for non-root apps
+pub fn set_default_umount_modules(enabled: bool) -> Result<()> {
+    let mut profile = get_app_profile(DEFAULT_PROFILE_UID).unwrap_or_else(|_| {
+        // Create new default profile if not exists
+        let mut p: ksu_uapi::app_profile = unsafe { std::mem::zeroed() };
+        p.version = ksu_uapi::KSU_APP_PROFILE_VER;
+        p.curr_uid = DEFAULT_PROFILE_UID;
+        p.allow_su = false;
+        // Set key to special marker for default profile (just "$")
+        for (slot, byte) in p.key.iter_mut().zip(b"$") {
+            *slot = *byte as _;
+        }
+        p
+    });
+    // Set union field - nrp_config for non-root profiles
+    profile.__bindgen_anon_1.nrp_config.profile.umount_modules = enabled;
+    set_app_profile(&profile)
+}

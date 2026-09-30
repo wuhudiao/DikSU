@@ -46,6 +46,7 @@ import kotlinx.coroutines.withContext
 import me.weishu.kernelsu.R
 import me.weishu.kernelsu.ui.LocalUiMode
 import me.weishu.kernelsu.ui.UiMode
+import me.weishu.kernelsu.ui.isMiuixFamily
 import top.yukonga.miuix.kmp.basic.TextButton as MiuixTextButton
 import top.yukonga.miuix.kmp.basic.TextField as MiuixTextField
 import top.yukonga.miuix.kmp.basic.Text as MiuixText
@@ -69,7 +70,7 @@ fun HideManagerDialog(
     onApply: (String, ByteArray?) -> Unit,
     onRestore: () -> Unit,
 ) {
-    if (LocalUiMode.current == UiMode.Miuix) {
+    if (LocalUiMode.current.isMiuixFamily) {
         HideManagerDialogMiuix(defaultName, canRestore, onDismiss, onApply, onRestore)
     } else {
         HideManagerDialogMaterial(defaultName, canRestore, onDismiss, onApply, onRestore)

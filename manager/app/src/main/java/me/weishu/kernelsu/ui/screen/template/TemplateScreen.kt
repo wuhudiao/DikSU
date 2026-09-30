@@ -22,6 +22,7 @@ import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.navigation3.Route
 import me.weishu.kernelsu.ui.util.isNetworkAvailable
 import me.weishu.kernelsu.ui.viewmodel.TemplateViewModel
+import me.weishu.kernelsu.ui.isMiuixFamily
 import top.yukonga.miuix.kmp.basic.SnackbarHostState as MiuixSnackbarHostState
 
 @Composable
@@ -46,7 +47,7 @@ fun AppProfileTemplateScreen() {
     LaunchedEffect(Unit) {
         navigator.observeResult<Boolean>(requestKey).collect { success ->
             if (success) {
-                if (uiMode == UiMode.Miuix) {
+                if (uiMode.isMiuixFamily) {
                     navigator.clearResult(requestKey)
                 }
                 viewModel.fetchTemplates()
@@ -110,7 +111,7 @@ fun AppProfileTemplateScreen() {
         },
         onCreateTemplate = {
             when (uiMode) {
-                UiMode.Miuix -> navigator.navigateForResult(
+                UiMode.Miuix, UiMode.MiuixStock -> navigator.navigateForResult(
                     Route.TemplateEditor(TemplateViewModel.TemplateInfo(), false),
                     requestKey,
                 )
@@ -122,7 +123,7 @@ fun AppProfileTemplateScreen() {
         },
         onOpenTemplate = { template ->
             when (uiMode) {
-                UiMode.Miuix -> navigator.navigateForResult(
+                UiMode.Miuix, UiMode.MiuixStock -> navigator.navigateForResult(
                     Route.TemplateEditor(template, !template.local),
                     requestKey,
                 )
@@ -135,7 +136,7 @@ fun AppProfileTemplateScreen() {
     )
 
     when (uiMode) {
-        UiMode.Miuix -> AppProfileTemplateScreenMiuix(
+        UiMode.Miuix, UiMode.MiuixStock -> AppProfileTemplateScreenMiuix(
             state = uiState,
             actions = actions,
             snackBarHost = miuixSnackbarHost,

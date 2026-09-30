@@ -37,7 +37,7 @@ fun DownloadDialog(
     onDismiss: () -> Unit,
 ) {
     when (LocalUiMode.current) {
-        UiMode.Miuix -> DownloadDialogMiuix(show, onConfirm, onDismiss)
+        UiMode.Miuix, UiMode.MiuixStock -> DownloadDialogMiuix(show, onConfirm, onDismiss)
         UiMode.Material -> DownloadDialogMaterial(show, onConfirm, onDismiss)
     }
 }

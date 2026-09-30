@@ -125,7 +125,7 @@ fun WebUIScreen(webUIState: WebUIState) {
     }
 
     when (LocalUiMode.current) {
-        UiMode.Miuix -> HandleWebUIEventMiuix(webUIState, fileLauncher)
+        UiMode.Miuix, UiMode.MiuixStock -> HandleWebUIEventMiuix(webUIState, fileLauncher)
         UiMode.Material -> HandleWebUIEventMaterial(webUIState, fileLauncher)
     }
 

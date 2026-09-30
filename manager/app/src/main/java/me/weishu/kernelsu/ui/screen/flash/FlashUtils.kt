@@ -44,6 +44,7 @@ import me.weishu.kernelsu.ui.util.flashModule
 import me.weishu.kernelsu.ui.util.installBoot
 import me.weishu.kernelsu.ui.util.restoreBoot
 import me.weishu.kernelsu.ui.util.uninstallPermanently
+import me.weishu.kernelsu.ui.isMiuixFamily
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date

@@ -72,6 +72,7 @@ import me.weishu.kernelsu.ui.navigation3.LocalNavigator
 import me.weishu.kernelsu.ui.util.Keymint
 import me.weishu.kernelsu.ui.util.KeymintApp
 import me.weishu.kernelsu.ui.util.KeymintStatus
+import me.weishu.kernelsu.ui.isMiuixFamily
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
@@ -167,7 +168,7 @@ fun KeymintScreen() {
     )
 
     when (LocalUiMode.current) {
-        UiMode.Miuix -> KeymintMiuix(groups, onBack)
+        UiMode.Miuix, UiMode.MiuixStock -> KeymintMiuix(groups, onBack)
         UiMode.Material -> KeymintMaterial(groups, onBack)
     }
 
@@ -711,7 +712,7 @@ private fun LevelGroup(
                 } else {
                     ""
                 }
-                if (LocalUiMode.current == UiMode.Miuix) {
+                if (LocalUiMode.current.isMiuixFamily) {
                     RadioButtonPreference(
                         title = level + currentMark,
                         summary = Keymint.LEVEL_NOTES[level],
@@ -735,7 +736,7 @@ private fun LevelGroup(
 /** A section heading inside a dialog, in whichever style the app is set to. */
 @Composable
 private fun DialogSectionTitle(title: String) {
-    if (LocalUiMode.current == UiMode.Miuix) {
+    if (LocalUiMode.current.isMiuixFamily) {
         SmallTitle(text = title)
     } else {
         Text(
@@ -754,7 +755,7 @@ private fun DialogNavRow(
     icon: ImageVector,
     onClick: () -> Unit,
 ) {
-    if (LocalUiMode.current == UiMode.Miuix) {
+    if (LocalUiMode.current.isMiuixFamily) {
         ArrowPreference(
             title = title,
             summary = summary,
@@ -900,7 +901,7 @@ private fun KeymintDialogShell(
         }
     }
 
-    if (uiMode == UiMode.Miuix) {
+    if (uiMode.isMiuixFamily) {
         OverlayDialog(
             show = true,
             title = title,
@@ -940,7 +941,7 @@ private fun ActionButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    if (LocalUiMode.current == UiMode.Miuix) {
+    if (LocalUiMode.current.isMiuixFamily) {
         MiuixTextButton(
             text = text,
             onClick = onClick,
@@ -959,7 +960,7 @@ private fun SearchField(
     modifier: Modifier = Modifier,
     onValueChange: (String) -> Unit,
 ) {
-    if (LocalUiMode.current == UiMode.Miuix) {
+    if (LocalUiMode.current.isMiuixFamily) {
         MiuixTextField(
             value = value,
             onValueChange = onValueChange,
@@ -989,7 +990,7 @@ private fun AppSwitchRow(app: KeymintApp, checked: Boolean, onToggle: () -> Unit
             label = app.label,
         )
     }
-    if (LocalUiMode.current == UiMode.Miuix) {
+    if (LocalUiMode.current.isMiuixFamily) {
         // A switch row (SwitchPreference) gets squeezed to nothing inside this dialog; the
         // checkbox row is the shape the app's own list dialog uses and measures correctly.
         CheckboxPreference(
@@ -1016,7 +1017,7 @@ private fun Loading() {
     Box(modifier = Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
         when (LocalUiMode.current) {
             UiMode.Material -> CircularProgressIndicator()
-            UiMode.Miuix -> InfiniteProgressIndicator()
+            UiMode.Miuix, UiMode.MiuixStock -> InfiniteProgressIndicator()
         }
     }
 }
@@ -1029,7 +1030,7 @@ private fun RowMessage(message: String) {
         .padding(horizontal = 4.dp, vertical = 12.dp)
     when (LocalUiMode.current) {
         // The Material one draws black inside a Miuix dialog: no Material theme is in scope there.
-        UiMode.Miuix -> MiuixText(text = message, color = colorScheme.onSurface, modifier = modifier)
+        UiMode.Miuix, UiMode.MiuixStock -> MiuixText(text = message, color = colorScheme.onSurface, modifier = modifier)
         UiMode.Material -> Text(text = message, modifier = modifier)
     }
 }

@@ -1550,7 +1550,11 @@ async function loadHome() {
 
     let featuresHtml = features.map(f => {
       const isOn = f.value > 0;
-      const isSupported = f.enabled;
+      // 999 (默认卸载模块) and 1000 (隐藏管理器) are value-typed features: their `enabled`
+      // field carries the current value, not a kernel-support flag. Treating it as one made
+      // a disabled switch render as "unsupported" and made it impossible to turn back on.
+      const valueTyped = (f.id === 999 || f.id === 1000);
+      const isSupported = valueTyped || f.enabled;
       const disabledAttr = isSupported ? '' : 'style="opacity:0.4;pointer-events:none;"';
       const clickHandler = isSupported ? `onclick="toggleFeature(${f.id}, this)"` : '';
       const descText = isSupported ? (f.description || '') : (f.description || '') + '（当前内核不支持）';

@@ -292,6 +292,10 @@ private fun decodeBitmap(context: Context, uri: Uri, hint: Int = 256): Bitmap? =
  */
 private fun iconPng(decoded: Bitmap, densityDpi: Int): ByteArray? = runCatching {
     val target = (ICON_DP * densityDpi / 160).coerceAtMost(2048)
+    // Keep the picture at the size the safe zone gives it (so the icon reads the same size as the
+    // original) but fill the rest of the canvas with the picture's own edge colour instead of
+    // white. A white ring appeared when a launcher showed more than the safe zone; a fill taken
+    // from the picture's own border never shows a seam.
     val content = (target * SAFE_ZONE).toInt()
     val ratio = minOf(content.toFloat() / decoded.width, content.toFloat() / decoded.height)
     val inner = Bitmap.createScaledBitmap(
@@ -302,7 +306,7 @@ private fun iconPng(decoded: Bitmap, densityDpi: Int): ByteArray? = runCatching 
     )
     val canvas = Bitmap.createBitmap(target, target, Bitmap.Config.ARGB_8888)
     Canvas(canvas).apply {
-        drawColor(Color.WHITE)
+        drawColor(edgeColor(decoded))
         drawBitmap(
             inner,
             (target - inner.width) / 2f,
@@ -317,6 +321,37 @@ private fun iconPng(decoded: Bitmap, densityDpi: Int): ByteArray? = runCatching 
         out.toByteArray()
     }
 }.getOrNull()
+
+/**
+ * The average of the picture's four edges  the colour a launcher sees outside the safe zone.
+ * Using it instead of white means the ring around the icon blends into the picture rather than
+ * showing a hard white border.
+ */
+private fun edgeColor(bmp: Bitmap): Int {
+    val w = bmp.width
+    val h = bmp.height
+    if (w < 2 || h < 2) return Color.WHITE
+    var r = 0L; var g = 0L; var b = 0L; var n = 0L
+    val step = maxOf(1, minOf(w, h) / 32)
+    var x = 0
+    while (x < w) {
+        for (y in intArrayOf(0, h - 1)) {
+            val p = bmp.getPixel(x, y)
+            r += Color.red(p); g += Color.green(p); b += Color.blue(p); n++
+        }
+        x += step
+    }
+    var y = 0
+    while (y < h) {
+        for (x2 in intArrayOf(0, w - 1)) {
+            val p = bmp.getPixel(x2, y)
+            r += Color.red(p); g += Color.green(p); b += Color.blue(p); n++
+        }
+        y += step
+    }
+    if (n == 0L) return Color.WHITE
+    return Color.rgb((r / n).toInt(), (g / n).toInt(), (b / n).toInt())
+}
 
 /** 108dp is the adaptive-icon canvas; anything the launcher shows is cut out of it. */
 private const val ICON_DP = 108

@@ -48,7 +48,10 @@ fun SuperUserPager(
                 if (!state.hasLoaded) {
                     viewModel.initializePreferences()
                     viewModel.loadAppList()
-                } else if (viewModel.isNeedRefresh) {
+                } else {
+                    // Always re-query profiles on resume: the kernel profile may have
+                    // changed outside the app (e.g. granted via the WebUI), which the
+                    // isNeedRefresh flag cannot observe.
                     viewModel.loadAppList(resort = false)
                 }
             }

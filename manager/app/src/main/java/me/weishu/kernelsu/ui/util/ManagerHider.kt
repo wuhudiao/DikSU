@@ -12,6 +12,7 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
+import java.security.Security
 import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -328,6 +329,21 @@ private const val MAIN_COMPONENT = "com.mngr.app.ui.MainActivity"
     /** Re-signs [apk] with the key the kernel knows, writing the result to [target]. */
     private fun sign(context: Context, apk: File, target: File) {
         context.assets.open(KEYSTORE_ASSET).use { stream ->
+            // Android 13's AOSP BouncyCastle fails to derive the PBES2 MAC key this keystore
+            // uses (JDK 21 writes PBES2+PBKDF2+AES_256), so KeyStore.load throws
+            // "No installed provider supports this key: PKCS12Key". Register both the AOSP
+            // BC (com.android.org.bouncycastle) and, if present, the bundled BC under the
+            // org.bouncycastle name, so a SecretKeyFactory for PKCS12/PBES2 is resolvable.
+            listOf(
+                "com.android.org.bouncycastle.jce.provider.BouncyCastleProvider",
+                "org.bouncycastle.jce.provider.BouncyCastleProvider",
+            ).forEach { cn ->
+                runCatching {
+                    val provider = Class.forName(cn).getDeclaredConstructor().newInstance() as java.security.Provider
+                    if (Security.getProvider(provider.name) == null) Security.addProvider(provider)
+                    Log.i(TAG, "registered keystore provider: ${provider.name}")
+                }.onFailure { Log.w(TAG, "cannot register keystore provider $cn: $it") }
+            }
             val keystore = KeyStore.getInstance("PKCS12")
                 .apply { load(stream, BuildConfig.KSU_KEYSTORE_PASSWORD.toCharArray()) }
             val key = keystore.getKey(BuildConfig.KSU_KEY_ALIAS, BuildConfig.KSU_KEY_PASSWORD.toCharArray()) as PrivateKey

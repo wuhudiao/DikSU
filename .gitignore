@@ -11,3 +11,6 @@ __pycache__
 /userspace/ksud/.lkm_image_bootstrap.o
 
 /manager/app/src/main/assets/calculator.apk
+
+# ddk build output (kernelsu-*.ko)
+/out

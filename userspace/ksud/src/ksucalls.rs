@@ -148,13 +148,25 @@ fn ksuctl<T>(request: u32, arg: *mut T) -> Result<i32> {
     if fd < 0 {
         bail!("could not retrieve kernelsu driver fd")
     }
-    unsafe {
-        let ret = libc::ioctl(fd as libc::c_int, request as i32, arg);
-        if ret < 0 {
-            bail!("ksuctl failed: {}", io::Error::last_os_error())
+    // Retry on EAGAIN (os error 11) and EINTR (os error 4) - up to 5 times
+    let mut last_err: Option<io::Error> = None;
+    for attempt in 0..5 {
+        unsafe {
+            let ret = libc::ioctl(fd as libc::c_int, request as i32, arg);
+            if ret >= 0 {
+                return Ok(ret);
+            }
+            let err = io::Error::last_os_error();
+            let raw = err.raw_os_error().unwrap_or(0);
+            if (raw == 11 || raw == 4) && attempt < 4 {
+                last_err = Some(err);
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                continue;
+            }
+            bail!("ksuctl failed: {err}")
         }
-        Ok(ret)
     }
+    bail!("ksuctl failed after retries: {}", last_err.unwrap())
 }
 
 // API implementations
@@ -260,10 +272,44 @@ pub fn get_feature(feature_id: u32) -> Result<(u64, bool)> {
 }
 
 /// Set feature value in kernel
+/// Note: kernel may set the value successfully but return EAGAIN (os error 11).
+/// We verify the value after setting and treat it as success if the value matches.
 pub fn set_feature(feature_id: u32, value: u64) -> Result<()> {
     let mut cmd = ksu_uapi::ksu_set_feature_cmd { feature_id, value };
-    ksuctl(ksu_uapi::KSU_IOCTL_SET_FEATURE, &raw mut cmd)?;
-    Ok(())
+    let result = ksuctl(ksu_uapi::KSU_IOCTL_SET_FEATURE, &raw mut cmd);
+    match result {
+        Ok(_) => {
+            log::info!("set_feature: id={feature_id} value={value} success");
+            Ok(())
+        }
+        Err(e) => {
+            let err_str = e.to_string();
+            // Kernel bug: may return EAGAIN even when value was set successfully
+            if err_str.contains("Try again") || err_str.contains("os error 11") {
+                // Verify the value was actually set
+                match get_feature(feature_id) {
+                    Ok((actual_value, supported)) => {
+                        if actual_value == value {
+                            log::info!(
+                                "set_feature: id={feature_id} value={value} ioctl returned EAGAIN but value verified, treating as success (supported={supported})"
+                            );
+                            return Ok(());
+                        }
+                        log::warn!(
+                            "set_feature: id={feature_id} value={value} ioctl returned EAGAIN, actual value={actual_value} (mismatch), returning error"
+                        );
+                    }
+                    Err(verify_err) => {
+                        log::warn!(
+                            "set_feature: id={feature_id} value={value} ioctl returned EAGAIN, verify failed: {verify_err}, returning original error"
+                        );
+                    }
+                }
+            }
+            log::error!("set_feature: id={feature_id} value={value} failed: {e}");
+            Err(e)
+        }
+    }
 }
 
 pub fn get_wrapped_fd(fd: RawFd) -> Result<RawFd> {

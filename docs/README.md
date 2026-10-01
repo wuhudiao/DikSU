@@ -2,8 +2,6 @@
 
 # DikSU
 
-DikSU is an Android kernel-level root solution forked from [KernelSU](https://github.com/tiann/KernelSU). The kernel and userspace follow KernelSU's implementation; on top of it, DikSU adds the two capabilities the original is missing: **a complete WebUI**, and **a set of hiding and configuration features the original Manager does not have**.
-
 - GitHub: https://github.com/wuhudiao/DikSU
 - Telegram: https://t.me/DIKSU66
 - QQ group: `864553367`

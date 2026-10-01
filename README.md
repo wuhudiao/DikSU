@@ -1,7 +1,5 @@
 # DikSU
 
-DikSU 是基于 [KernelSU](https://github.com/tiann/KernelSU) 的 Android 内核级 Root 方案分支。内核与用户态沿用 KernelSU 的实现，在其之上补上了原版缺失的两块能力：**一套完整的网页端（WebUI）**，以及**一组原版管理器没有的隐藏与配置功能**。
-
 - GitHub：https://github.com/wuhudiao/DikSU
 - Telegram：https://t.me/DIKSU66
 - QQ 交流群：`864553367`

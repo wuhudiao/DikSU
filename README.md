@@ -1,8 +1,5 @@
 # DikSU
 
-- GitHub：https://github.com/wuhudiao/DikSU
-- Telegram：https://t.me/DIKSU66
-- QQ 交流群：`864553367`
 
 ---
 

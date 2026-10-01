@@ -95,15 +95,6 @@ Runs the same HMA-OSS script straight from Settings (Standard / Scene), without 
 ### 4. keyMint panel
 A dedicated settings page (about 1000 lines) with the same content as the WebUI keyMint page: daemon status, property fix, app routing, keybox local / remote, log level, restart. If the `oh_my_keymint` module is not installed it shows the module id and an install hint.
 
-### 5. Settings reorganisation
-The original mixes all switches into one long list; DikSU splits them into:
-- **Basic features**: traditional su, kernel-level module unmounting, SELinux hiding, su log, ADB root, soft reboot, and so on (these switches come from the original; once rearranged, each is disabled automatically when the running kernel does not support it)
-- **Other features**: the one-tap Hide My Applist config and the keyMint panel
-
-### 6. About page and updates
-- The About page links to GitHub and Telegram
-- Update check goes to `https://api.github.com/repos/wuhudiao/DikSU/releases/latest`
-
 ---
 
 ## 3. Interface styles

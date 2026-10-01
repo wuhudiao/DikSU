@@ -95,15 +95,6 @@ KernelSU 答复 Magisk 的 "Hide the App"。因为包名是烘焙进签名 APK �
 ### 4. keyMint 配置面板
 一个独立设置页（约 1000 行），内容与网页端的 keyMint 页一致：守护进程状态、属性修正、应用路由、keybox 本地 / 远程、日志级别、重启。没装 `oh_my_keymint` 模块时会给出模块 id 与安装提示。
 
-### 5. 设置页重组
-原版把开关混在一个长列表里，DikSU 拆成：
-- **基本功能设置**：传统 SU 命令、内核级卸载模块、隐藏 SELinux、SU 日志、ADB Root、软重启等（这些开关本身来自原版，重排后按内核支持情况自动禁用）
-- **其他功能**：一键配置隐藏应用列表 + keyMint 面板
-
-### 6. 关于页与更新
-- 关于页带 GitHub 与 Telegram 链接
-- 检查更新走 `https://api.github.com/repos/wuhudiao/DikSU/releases/latest`
-
 ---
 
 ## 三、界面风格
